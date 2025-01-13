@@ -1,6 +1,6 @@
 import { CronJob } from 'cron'
 import dayjs from 'dayjs'
-import { getEvents } from '../services/events'
+import { getEventDate, getEvents } from '../services/events'
 import type { Event } from '../types/events'
 import { sendNotifications } from '../utils/sendNotifications'
 
@@ -16,11 +16,9 @@ function createJob(event: Event, cronDate: dayjs.Dayjs) {
 
 async function bootstrap() {
   const events = await getEvents()
-  const jobs = events.map(e => {
-    const startsAt = dayjs(e.startsAt).tz('Asia/Shanghai')
-
-    return e.notifyMinutes.map(m => startsAt.subtract(m, 'minutes')).map(d => createJob(e, d))
-  })
+  const jobs = events.map(e =>
+    e.notifyMinutes.map(m => getEventDate(e).tz('Asia/Shanghai').subtract(m, 'minutes')).map(d => createJob(e, d)),
+  )
   console.log('🚀 ~ bootstrap ~ jobs:', jobs.flat().length)
 }
 

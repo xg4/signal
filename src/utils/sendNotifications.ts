@@ -3,13 +3,14 @@ import { eq } from 'drizzle-orm'
 import webpush from 'web-push'
 import { db } from '../db/config'
 import { subscriptions } from '../db/schema'
+import { getEventDate } from '../services/events'
 import type { Event } from '../types/events'
 
 export async function sendNotifications(event: Event) {
   // 获取所有有效的订阅
   const subs = await db.select().from(subscriptions)
 
-  const startsAt = dayjs(event.startsAt)
+  const startsAt = getEventDate(event)
   const diff = startsAt.diff(dayjs(), 'minute')
   const title = [event.name, diff <= 1 ? '开始' : diff <= 5 ? '即将开始' : startsAt.fromNow() + '开始'].join(' - ')
   const payload = JSON.stringify({
