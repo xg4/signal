@@ -1,0 +1,1 @@
+ALTER TABLE "events" ALTER COLUMN "notify_minutes" SET DEFAULT '{10}';
