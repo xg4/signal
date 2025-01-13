@@ -16,5 +16,5 @@ export const subscriptions = pgTable('subscriptions', {
   endpoint: text('endpoint').notNull(),
   auth: text('auth').notNull(),
   p256dh: text('p256dh').notNull(),
-  hash: text('hash').notNull().unique(),
+  deviceCode: text('device_code').notNull(),
 })

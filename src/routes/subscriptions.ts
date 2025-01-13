@@ -1,9 +1,9 @@
 import { zValidator } from '@hono/zod-validator'
-import { Hono } from 'hono'
-import { z } from 'zod'
-import webpush from 'web-push'
 import { eq } from 'drizzle-orm'
+import { Hono } from 'hono'
 import { isEmpty } from 'lodash-es'
+import webpush from 'web-push'
+import { z } from 'zod'
 import { db } from '../db/config.js'
 import { subscriptions } from '../db/schema.js'
 import { generateSubscriptionKey } from '../utils/crypto.js'
@@ -26,13 +26,13 @@ export const subscriptionsRoute = new Hono()
     async c => {
       try {
         const { subscription } = c.req.valid('json')
-        const subscriptionHash = await generateSubscriptionKey(subscription)
+        const deviceCode = await generateSubscriptionKey(subscription)
 
         // 检查是否已经订阅
         const existingSubscription = await db
           .select()
           .from(subscriptions)
-          .where(eq(subscriptions.hash, subscriptionHash))
+          .where(eq(subscriptions.deviceCode, deviceCode))
 
         if (!isEmpty(existingSubscription)) {
           return c.json({ message: '已经订阅' }, { status: 409 })
@@ -43,7 +43,7 @@ export const subscriptionsRoute = new Hono()
           endpoint: subscription.endpoint,
           auth: subscription.keys.auth,
           p256dh: subscription.keys.p256dh,
-          hash: subscriptionHash,
+          deviceCode,
         })
 
         try {
@@ -59,7 +59,7 @@ export const subscriptionsRoute = new Hono()
           console.error('发送欢迎通知失败:', error)
         }
 
-        return c.json(subscriptionHash, { status: 201 })
+        return c.json(deviceCode, { status: 201 })
       } catch (error) {
         console.error('订阅失败:', error)
         return c.json({ error: '订阅失败' }, { status: 500 })
@@ -67,18 +67,18 @@ export const subscriptionsRoute = new Hono()
     },
   )
   .get(
-    '/:hash',
+    '/:code',
     zValidator(
       'param',
       z.object({
-        hash: z.string().length(64), // SHA-256 哈希值长度为 64 个字符
+        code: z.string().length(64), // SHA-256 哈希值长度为 64 个字符
       }),
     ),
     async c => {
       try {
-        const { hash } = c.req.valid('param')
+        const { code } = c.req.valid('param')
 
-        const existingSubscription = await db.select().from(subscriptions).where(eq(subscriptions.hash, hash))
+        const existingSubscription = await db.select().from(subscriptions).where(eq(subscriptions.deviceCode, code))
 
         return c.json(!isEmpty(existingSubscription))
       } catch (error) {
@@ -88,23 +88,23 @@ export const subscriptionsRoute = new Hono()
     },
   )
   .delete(
-    '/:hash',
+    '/:code',
     zValidator(
       'param',
       z.object({
-        hash: z.string().length(64), // SHA-256 哈希值长度为 64 个字符
+        code: z.string().length(64), // SHA-256 哈希值长度为 64 个字符
       }),
     ),
     async c => {
       try {
-        const { hash } = c.req.valid('param')
-        const existingSubscription = await db.select().from(subscriptions).where(eq(subscriptions.hash, hash))
+        const { code } = c.req.valid('param')
+        const existingSubscription = await db.select().from(subscriptions).where(eq(subscriptions.deviceCode, code))
 
         if (isEmpty(existingSubscription)) {
           return c.json({ error: '订阅不存在' }, { status: 404 })
         }
 
-        await db.delete(subscriptions).where(eq(subscriptions.hash, hash))
+        await db.delete(subscriptions).where(eq(subscriptions.deviceCode, code))
 
         return c.json({ message: '删除成功' }, { status: 200 })
       } catch (error) {
