@@ -15,6 +15,13 @@
       "when": 1736735797359,
       "tag": "0001_puzzling_maverick",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1736741959907,
+      "tag": "0002_silly_kate_bishop",
+      "breakpoints": true
     }
   ]
 }

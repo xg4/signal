@@ -18,12 +18,8 @@ async function bootstrap() {
   const events = await getEvents()
   const jobs = events.map(e => {
     const startsAt = dayjs(e.startsAt).tz('Asia/Shanghai')
-    return [
-      startsAt.subtract(30, 'minutes'),
-      startsAt.subtract(15, 'minutes'),
-      startsAt.subtract(5, 'minutes'),
-      startsAt,
-    ].map(d => createJob(e, d))
+
+    return e.notifyMinutes.map(m => startsAt.subtract(m, 'minutes')).map(d => createJob(e, d))
   })
   console.log('🚀 ~ bootstrap ~ jobs:', jobs.flat().length)
 }

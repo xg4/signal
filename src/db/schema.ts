@@ -8,6 +8,7 @@ export const events = pgTable('events', {
   dayOfWeek: integer('day_of_week').notNull(), // 0-6 表示周日到周六
   startTime: time('start_time').notNull(),
   durationMinutes: integer('duration_minutes').notNull(),
+  notifyMinutes: integer('notify_minutes').array().notNull().default([0, 5, 30]),
 })
 
 // 订阅表

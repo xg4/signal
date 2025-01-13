@@ -10,8 +10,10 @@ export async function sendNotifications(event: Event) {
   const subs = await db.select().from(subscriptions)
 
   const startsAt = dayjs(event.startsAt)
+  const diff = startsAt.diff(dayjs(), 'minute')
+  const title = [event.name, diff <= 1 ? '开始' : diff <= 5 ? '即将开始' : startsAt.fromNow() + '开始'].join(' - ')
   const payload = JSON.stringify({
-    title: `${event.name} - ${startsAt.diff(dayjs(), 'minute') <= 1 ? '开始' : startsAt.fromNow() + '即将开始'}`,
+    title,
     body: event.description || '',
     icon: '/images/icon_128x128.png',
   })
