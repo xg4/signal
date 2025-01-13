@@ -8,10 +8,10 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import webpush from 'web-push'
-import { ProcessEnv } from './env.js'
-import { eventsRoute } from './routes/events.js'
-import { subscriptionsRoute } from './routes/subscriptions.js'
-import './schedules/subscriptions.js'
+import { ProcessEnv } from './env'
+import { eventsRoute } from './routes/events'
+import { subscriptionsRoute } from './routes/subscriptions'
+import './schedules/subscriptions'
 
 dayjs.extend(relativeTime)
 dayjs.locale('zh-cn')

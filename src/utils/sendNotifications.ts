@@ -1,9 +1,9 @@
-import { db } from '../db/config.js'
-import { subscriptions } from '../db/schema.js'
-import webpush from 'web-push'
-import { eq } from 'drizzle-orm'
-import type { Event } from '../types/events.js'
 import dayjs from 'dayjs'
+import { eq } from 'drizzle-orm'
+import webpush from 'web-push'
+import { db } from '../db/config'
+import { subscriptions } from '../db/schema'
+import type { Event } from '../types/events'
 
 export async function sendNotifications(event: Event) {
   // 获取所有有效的订阅

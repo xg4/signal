@@ -1,8 +1,8 @@
 import { CronJob } from 'cron'
 import dayjs from 'dayjs'
-import { getEvents } from '../services/events.js'
-import type { Event } from '../types/events.js'
-import { sendNotifications } from '../utils/sendNotifications.js'
+import { getEvents } from '../services/events'
+import type { Event } from '../types/events'
+import { sendNotifications } from '../utils/sendNotifications'
 
 function createJob(event: Event, cronDate: dayjs.Dayjs) {
   return new CronJob(

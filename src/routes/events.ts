@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { getEvents } from '../services/events.js'
+import { getEvents } from '../services/events'
 
 export const eventsRoute = new Hono().get('/', async c => {
   try {

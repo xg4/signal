@@ -1,7 +1,7 @@
 import dayjs from 'dayjs'
 import { sortBy } from 'lodash-es'
-import { db } from '../db/config.js'
-import { events } from '../db/schema.js'
+import { db } from '../db/config'
+import { events } from '../db/schema'
 
 export function setDayOfWeek(dayOfWeek: number) {
   const now = dayjs()

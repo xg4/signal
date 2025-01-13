@@ -4,9 +4,9 @@ import { Hono } from 'hono'
 import { isEmpty } from 'lodash-es'
 import webpush from 'web-push'
 import { z } from 'zod'
-import { db } from '../db/config.js'
-import { subscriptions } from '../db/schema.js'
-import { generateSubscriptionKey } from '../utils/crypto.js'
+import { db } from '../db/config'
+import { subscriptions } from '../db/schema'
+import { generateSubscriptionKey } from '../utils/crypto'
 
 export const subscriptionsRoute = new Hono()
   .post(

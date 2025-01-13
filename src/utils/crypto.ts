@@ -1,3 +1,5 @@
+import { get } from 'lodash-es'
+
 export async function generateUniqueKey(input: string): Promise<string> {
   // 将订阅信息转换为 ArrayBuffer
   const message = new TextEncoder().encode(input)
@@ -12,5 +14,7 @@ export async function generateUniqueKey(input: string): Promise<string> {
   return hashHex
 }
 export function generateSubscriptionKey(subscription: Partial<{ endpoint: string; keys: Record<string, string> }>) {
-  return generateUniqueKey([subscription.endpoint, subscription.keys?.auth, subscription.keys?.p256dh].join('|'))
+  return generateUniqueKey(
+    [get(subscription, 'endpoint'), get(subscription, 'keys.auth'), get(subscription, 'keys.p256dh')].join('|'),
+  )
 }
