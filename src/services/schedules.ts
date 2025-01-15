@@ -11,7 +11,7 @@ export function updateSchedule(event: EventItem) {
     })
   }
 
-  const newJobs = createJob(event)
+  const newJobs = createCronJob(event)
   cronJobs.set(event.id, newJobs)
   console.log('cron job 更新成功', event.id, [...cronJobs.values()].flat().length)
 }
@@ -22,7 +22,17 @@ export function getCronJobs() {
   return cronJobs
 }
 
-function createJob(event: EventItem) {
+export function deleteCronJob(eventId: number) {
+  const jobs = cronJobs.get(eventId)
+  if (jobs) {
+    jobs.forEach(job => {
+      job.stop()
+    })
+  }
+  cronJobs.delete(eventId)
+}
+
+export function createCronJob(event: EventItem) {
   const cronDates = event.notifyMinutes.map(m => getEventDate(event).tz('Asia/Shanghai').subtract(m, 'minutes'))
   return cronDates.map(
     cronDate =>
@@ -38,7 +48,7 @@ function createJob(event: EventItem) {
 
 async function bootstrap() {
   const events = await getEvents()
-  const jobs = events.map(e => [e.id, createJob(e)] as const)
+  const jobs = events.map(e => [e.id, createCronJob(e)] as const)
   cronJobs = new Map(jobs)
   console.log('🚀 ~ bootstrap ~ cron jobs:', [...cronJobs.values()].flat().length)
 }

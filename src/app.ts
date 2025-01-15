@@ -10,7 +10,7 @@ import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import webpush from 'web-push'
 import { ProcessEnv } from './env'
-import { eventsRoute, eventsV2Route, schedulesV2Route, subscriptionsRoute } from './routes'
+import { eventsRoute, eventsV2Route, schedulesV2Route, subscriptionsRoute, subscriptionsV2Route } from './routes'
 
 dayjs.extend(relativeTime)
 dayjs.locale('zh-cn')
@@ -44,5 +44,6 @@ app
   )
   .route('/schedules', schedulesV2Route)
   .route('/events', eventsV2Route)
+  .route('/subscriptions', subscriptionsV2Route)
 
 export default app

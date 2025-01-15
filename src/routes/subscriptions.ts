@@ -15,7 +15,7 @@ export const subscriptionsRoute = new Hono()
       'json',
       z.object({
         subscription: z.object({
-          endpoint: z.string(),
+          endpoint: z.string().url(),
           keys: z.object({
             auth: z.string(),
             p256dh: z.string(),
