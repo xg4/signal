@@ -4,9 +4,9 @@ import webpush from 'web-push'
 import { db } from '../db/config'
 import { subscriptions } from '../db/schema'
 import { getEventDate } from '../services/events'
-import type { Event } from '../types/events'
+import type { EventItem } from '../types/events'
 
-export async function sendNotifications(event: Event) {
+export async function sendNotifications(event: EventItem) {
   // 获取所有有效的订阅
   const subs = await db.select().from(subscriptions)
 

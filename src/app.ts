@@ -5,13 +5,12 @@ import relativeTime from 'dayjs/plugin/relativeTime'
 import timezone from 'dayjs/plugin/timezone'
 import utc from 'dayjs/plugin/utc'
 import { Hono } from 'hono'
+import { basicAuth } from 'hono/basic-auth'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import webpush from 'web-push'
 import { ProcessEnv } from './env'
-import { eventsRoute } from './routes/events'
-import { subscriptionsRoute } from './routes/subscriptions'
-import './schedules/subscriptions'
+import { eventsRoute, eventsV2Route, schedulesV2Route, subscriptionsRoute } from './routes'
 
 dayjs.extend(relativeTime)
 dayjs.locale('zh-cn')
@@ -32,6 +31,18 @@ const app = new Hono().use(cors()).use(
   }),
 )
 
-app.basePath('/api').route('/subscriptions', subscriptionsRoute).route('/events', eventsRoute)
+app
+  .basePath('/api')
+  .route('/subscriptions', subscriptionsRoute)
+  .route('/events', eventsRoute)
+  .basePath('/v2')
+  .use(
+    basicAuth({
+      username: ProcessEnv.AUTH_USERNAME,
+      password: ProcessEnv.AUTH_PASSWORD,
+    }),
+  )
+  .route('/schedules', schedulesV2Route)
+  .route('/events', eventsV2Route)
 
 export default app
