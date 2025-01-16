@@ -31,6 +31,7 @@ export const eventsRoute = new Hono()
           startTime: z.string(),
           durationMinutes: z.number(),
           notifyMinutes: z.array(z.number()).optional(),
+          locations: z.array(z.string()).optional(),
         })
         .array()
       const jsonData = fileSchema.parse(JSON.parse(fileContent))
@@ -66,11 +67,12 @@ export const eventsRoute = new Hono()
       'json',
       z.object({
         name: z.string(),
-        description: z.string(),
+        description: z.string().optional(),
         dayOfWeek: z.number(),
         startTime: z.string(),
         durationMinutes: z.number(),
-        notifyMinutes: z.array(z.number()),
+        notifyMinutes: z.array(z.number()).optional(),
+        locations: z.array(z.string()).optional(),
       }),
     ),
     async c => {
@@ -91,11 +93,12 @@ export const eventsRoute = new Hono()
       'json',
       z.object({
         name: z.string(),
-        description: z.string(),
+        description: z.string().optional(),
         dayOfWeek: z.number(),
         startTime: z.string(),
         durationMinutes: z.number(),
         notifyMinutes: z.array(z.number()),
+        locations: z.array(z.string()),
       }),
     ),
     zValidator('param', z.object({ id: z.coerce.number().int() })),

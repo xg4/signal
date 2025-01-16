@@ -6,6 +6,7 @@ export type Event = {
   startTime: string
   durationMinutes: number
   notifyMinutes: number[]
+  locations: string[]
 
   startsAt: Date
   endsAt: Date

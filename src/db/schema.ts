@@ -11,6 +11,7 @@ export const events = pgTable(
     startTime: time('start_time').notNull(),
     durationMinutes: integer('duration_minutes').notNull(),
     notifyMinutes: integer('notify_minutes').array().notNull().default([]),
+    locations: text('locations').array().notNull().default([]),
   },
   t => ({
     unique: unique().on(t.name, t.dayOfWeek, t.startTime),
