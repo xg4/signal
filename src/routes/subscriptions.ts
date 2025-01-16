@@ -1,7 +1,7 @@
 import { zValidator } from '@hono/zod-validator'
 import { eq } from 'drizzle-orm'
 import { Hono } from 'hono'
-import { isEmpty } from 'lodash-es'
+import { isEmpty, isNil } from 'lodash-es'
 import webpush from 'web-push'
 import { z } from 'zod'
 import { db } from '../db/config'
@@ -29,7 +29,7 @@ export const subscriptionsRoute = new Hono()
         const deviceCode = await generateSubscriptionKey(subscription)
 
         // 检查是否已经订阅
-        const existingSubscription = await db
+        const [existingSubscription] = await db
           .select()
           .from(subscriptions)
           .where(eq(subscriptions.deviceCode, deviceCode))
@@ -71,16 +71,16 @@ export const subscriptionsRoute = new Hono()
     zValidator(
       'param',
       z.object({
-        code: z.string().length(64), // SHA-256 哈希值长度为 64 个字符
+        code: z.string().length(64),
       }),
     ),
     async c => {
       try {
         const { code } = c.req.valid('param')
 
-        const existingSubscription = await db.select().from(subscriptions).where(eq(subscriptions.deviceCode, code))
+        const [existingSubscription] = await db.select().from(subscriptions).where(eq(subscriptions.deviceCode, code))
 
-        return c.json(!isEmpty(existingSubscription))
+        return c.json(!isNil(existingSubscription))
       } catch (error) {
         console.error('检查订阅状态失败:', error)
         return c.json({ error: '检查订阅状态失败' }, { status: 500 })
@@ -98,9 +98,9 @@ export const subscriptionsRoute = new Hono()
     async c => {
       try {
         const { code } = c.req.valid('param')
-        const existingSubscription = await db.select().from(subscriptions).where(eq(subscriptions.deviceCode, code))
+        const [existingSubscription] = await db.select().from(subscriptions).where(eq(subscriptions.deviceCode, code))
 
-        if (isEmpty(existingSubscription)) {
+        if (isNil(existingSubscription)) {
           return c.json({ error: '订阅不存在' }, { status: 404 })
         }
 

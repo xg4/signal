@@ -43,6 +43,13 @@
       "when": 1737009363576,
       "tag": "0005_warm_leech",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1737018240199,
+      "tag": "0006_redundant_karnak",
+      "breakpoints": true
     }
   ]
 }

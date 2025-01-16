@@ -15,7 +15,7 @@ export async function sendNotifications(event: EventItem) {
   const title = [event.name, diff <= 1 ? '开始' : diff <= 5 ? '即将开始' : startsAt.fromNow() + '开始'].join(' - ')
   const payload = JSON.stringify({
     title,
-    body: event.description || '',
+    body: event.locations.join(' - ') || event.description || '',
     icon: '/images/icon_128x128.png',
   })
 

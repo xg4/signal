@@ -1,4 +1,4 @@
-import { integer, pgTable, serial, text, time, unique } from 'drizzle-orm/pg-core'
+import { integer, pgTable, serial, text, time, timestamp, unique } from 'drizzle-orm/pg-core'
 
 // 活动表
 export const events = pgTable(
@@ -12,6 +12,11 @@ export const events = pgTable(
     durationMinutes: integer('duration_minutes').notNull(),
     notifyMinutes: integer('notify_minutes').array().notNull().default([]),
     locations: text('locations').array().notNull().default([]),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at')
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
   },
   t => ({
     unique: unique().on(t.name, t.dayOfWeek, t.startTime),
@@ -25,4 +30,9 @@ export const subscriptions = pgTable('subscriptions', {
   auth: text('auth').notNull(),
   p256dh: text('p256dh').notNull(),
   deviceCode: text('device_code').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at')
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
 })
