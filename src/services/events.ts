@@ -17,16 +17,5 @@ export function getEventDate(event: { dayOfWeek: number; startTime: string }) {
 
 export async function getEvents() {
   const allEvents = await db.select().from(events)
-  return sortBy(
-    allEvents.map(event => {
-      const startsAt = getEventDate(event)
-      const endsAt = startsAt.add(event.durationMinutes, 'minute')
-      return {
-        ...event,
-        startsAt: startsAt.toDate(),
-        endsAt: endsAt.toDate(),
-      }
-    }),
-    'startsAt',
-  )
+  return sortBy(allEvents, e => getEventDate(e).unix())
 }

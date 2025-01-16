@@ -7,9 +7,4 @@ export type Event = {
   durationMinutes: number
   notifyMinutes: number[]
   locations: string[]
-
-  startsAt: Date
-  endsAt: Date
 }
-
-export type EventItem = Omit<Event, 'startsAt' | 'endsAt'>

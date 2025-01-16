@@ -1,5 +1,6 @@
 export { eventsRoute } from './events'
 export { subscriptionsRoute } from './subscriptions'
 export { eventsRoute as eventsV2Route } from './v2/events'
+export { notificationsRoute as notificationsV2Route } from './v2/notifications'
 export { schedulesRoute as schedulesV2Route } from './v2/schedules'
 export { subscriptionsRoute as subscriptionsV2Route } from './v2/subscriptions'

@@ -4,20 +4,33 @@ import webpush from 'web-push'
 import { db } from '../db/config'
 import { subscriptions } from '../db/schema'
 import { getEventDate } from '../services/events'
-import type { EventItem } from '../types/events'
+import type { Event } from '../types/events'
 
-export async function sendNotifications(event: EventItem) {
+function generatePayload(title: string, body: string) {
+  return JSON.stringify({
+    title,
+    body,
+    icon: '/images/icon_128x128.png',
+  })
+}
+
+export async function sendByDeviceCode(deviceCode: string, title: string, body: string) {
+  const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.deviceCode, deviceCode)).limit(1)
+  if (!sub) {
+    throw new Error('订阅不存在')
+  }
+  const payload = generatePayload(title, body)
+  await webpush.sendNotification({ endpoint: sub.endpoint, keys: { auth: sub.auth, p256dh: sub.p256dh } }, payload)
+}
+
+export async function sendToAllSubscriptions(event: Event) {
   // 获取所有有效的订阅
   const subs = await db.select().from(subscriptions)
 
   const startsAt = getEventDate(event)
   const diff = startsAt.diff(dayjs(), 'minute')
   const title = [event.name, diff <= 1 ? '开始' : diff <= 5 ? '即将开始' : startsAt.fromNow() + '开始'].join(' - ')
-  const payload = JSON.stringify({
-    title,
-    body: event.locations.join(' - ') || event.description || '',
-    icon: '/images/icon_128x128.png',
-  })
+  const payload = generatePayload(title, event.locations.join(' - ') || event.description || '')
 
   await Promise.allSettled(
     subs.map(async sub => {

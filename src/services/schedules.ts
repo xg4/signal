@@ -1,9 +1,8 @@
 import { CronJob } from 'cron'
-import type { EventItem } from '../types/events'
-import { sendNotifications } from '../utils/sendNotifications'
+import type { Event } from '../types/events'
 import { getEventDate, getEvents } from './events'
-
-export function updateSchedule(event: EventItem) {
+import { sendToAllSubscriptions } from './notifications'
+export function updateSchedule(event: Event) {
   const jobs = cronJobs.get(event.id)
   if (jobs) {
     jobs.forEach(job => {
@@ -32,13 +31,13 @@ export function deleteCronJob(eventId: number) {
   cronJobs.delete(eventId)
 }
 
-export function createCronJob(event: EventItem) {
+export function createCronJob(event: Event) {
   const cronDates = event.notifyMinutes.map(m => getEventDate(event).tz('Asia/Shanghai').subtract(m, 'minutes'))
   return cronDates.map(
     cronDate =>
       new CronJob(
         `${cronDate.second()} ${cronDate.minute()} ${cronDate.hour()} * * ${event.dayOfWeek}`,
-        () => sendNotifications(event),
+        () => sendToAllSubscriptions(event),
         null,
         true,
         'Asia/Shanghai',

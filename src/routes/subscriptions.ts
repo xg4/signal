@@ -2,10 +2,10 @@ import { zValidator } from '@hono/zod-validator'
 import { eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { isEmpty, isNil } from 'lodash-es'
-import webpush from 'web-push'
 import { z } from 'zod'
 import { db } from '../db/config'
 import { subscriptions } from '../db/schema'
+import { sendByDeviceCode } from '../services/notifications'
 import { generateSubscriptionKey } from '../utils/crypto'
 
 export const subscriptionsRoute = new Hono()
@@ -47,14 +47,7 @@ export const subscriptionsRoute = new Hono()
         })
 
         try {
-          await webpush.sendNotification(
-            subscription,
-            JSON.stringify({
-              title: '订阅成功',
-              body: '您已成功订阅所有活动通知',
-              icon: '/images/icon_128x128.png',
-            }),
-          )
+          await sendByDeviceCode(deviceCode, '订阅成功', '您已成功订阅所有活动通知')
         } catch (error) {
           console.error('发送欢迎通知失败:', error)
         }
