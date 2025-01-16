@@ -26,7 +26,7 @@ export const eventsRoute = new Hono()
       const fileSchema = z
         .object({
           name: z.string(),
-          description: z.string().optional(),
+          description: z.string().optional().nullable(),
           dayOfWeek: z.number(),
           startTime: z.string(),
           durationMinutes: z.number(),
@@ -67,7 +67,7 @@ export const eventsRoute = new Hono()
       'json',
       z.object({
         name: z.string(),
-        description: z.string().optional(),
+        description: z.string().optional().nullable(),
         dayOfWeek: z.number(),
         startTime: z.string(),
         durationMinutes: z.number(),
@@ -93,7 +93,7 @@ export const eventsRoute = new Hono()
       'json',
       z.object({
         name: z.string(),
-        description: z.string().optional(),
+        description: z.string().optional().nullable(),
         dayOfWeek: z.number(),
         startTime: z.string(),
         durationMinutes: z.number(),
