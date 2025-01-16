@@ -1,7 +1,8 @@
 import { CronJob } from 'cron'
+import dayjs from 'dayjs'
 import type { Event } from '../types/events'
 import { getEventDate, getEvents } from './events'
-import { sendToAllSubscriptions } from './notifications'
+import { sendToAll } from './notifications'
 export function updateSchedule(event: Event) {
   const jobs = cronJobs.get(event.id)
   if (jobs) {
@@ -37,7 +38,13 @@ export function createCronJob(event: Event) {
     cronDate =>
       new CronJob(
         `${cronDate.second()} ${cronDate.minute()} ${cronDate.hour()} * * ${event.dayOfWeek}`,
-        () => sendToAllSubscriptions(event),
+        async () => {
+          const startsAt = getEventDate(event)
+          const diff = startsAt.diff(dayjs(), 'minute')
+          const title = [event.name, diff <= 1 ? '开始' : startsAt.fromNow() + '即将开始'].join(' - ')
+          const body = event.locations.join(' - ') || event.description || ''
+          await sendToAll(title, body)
+        },
         null,
         true,
         'Asia/Shanghai',
