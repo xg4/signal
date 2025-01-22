@@ -2,6 +2,14 @@ import { eq } from 'drizzle-orm'
 import webpush from 'web-push'
 import { db } from '../db/config'
 import { subscriptions } from '../db/schema'
+import { ProcessEnv } from '../env'
+
+const vapidKeys = {
+  publicKey: ProcessEnv.VAPID_PUBLIC_KEY,
+  privateKey: ProcessEnv.VAPID_PRIVATE_KEY,
+}
+
+webpush.setVapidDetails('mailto:your-email@example.com', vapidKeys.publicKey, vapidKeys.privateKey)
 
 function generatePayload(title: string, body: string) {
   return JSON.stringify({
