@@ -6,8 +6,7 @@ const Env = z.object({
   VAPID_PUBLIC_KEY: z.string(),
   VAPID_PRIVATE_KEY: z.string(),
   DATABASE_URL: z.string(),
-  AUTH_USERNAME: z.string(),
-  AUTH_PASSWORD: z.string(),
+  JWT_SECRET: z.string(),
 })
 
 export const ProcessEnv = Env.parse(process.env)

@@ -50,6 +50,13 @@
       "when": 1737018240199,
       "tag": "0006_redundant_karnak",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1737514440049,
+      "tag": "0007_perpetual_red_ghost",
+      "breakpoints": true
     }
   ]
 }

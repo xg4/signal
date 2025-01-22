@@ -5,12 +5,13 @@ import relativeTime from 'dayjs/plugin/relativeTime'
 import timezone from 'dayjs/plugin/timezone'
 import utc from 'dayjs/plugin/utc'
 import { Hono } from 'hono'
-import { basicAuth } from 'hono/basic-auth'
 import { cors } from 'hono/cors'
+import { jwt } from 'hono/jwt'
 import { logger } from 'hono/logger'
 import webpush from 'web-push'
 import { ProcessEnv } from './env'
 import {
+  authRoute,
   eventsRoute,
   eventsV2Route,
   notificationsV2Route,
@@ -40,13 +41,13 @@ const app = new Hono().use(cors()).use(
 
 app
   .basePath('/api')
+  .route('/auth', authRoute)
   .route('/subscriptions', subscriptionsRoute)
   .route('/events', eventsRoute)
   .basePath('/v2')
   .use(
-    basicAuth({
-      username: ProcessEnv.AUTH_USERNAME,
-      password: ProcessEnv.AUTH_PASSWORD,
+    jwt({
+      secret: ProcessEnv.JWT_SECRET,
     }),
   )
   .route('/schedules', schedulesV2Route)

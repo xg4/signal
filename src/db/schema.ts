@@ -36,3 +36,16 @@ export const subscriptions = pgTable('subscriptions', {
     .defaultNow()
     .$onUpdate(() => new Date()),
 })
+
+// 用户表
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  username: text('username').notNull().unique(),
+  password: text('password').notNull(), // 存储加密后的密码
+  nickname: text('nickname'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at')
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+})
