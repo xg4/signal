@@ -5,3 +5,8 @@ npm-debug.log
 README.md
 .next
 .git
+prettier.config.mjs
+.editorconfig
+.github
+.gitignore
+LICENSE

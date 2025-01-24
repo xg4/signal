@@ -20,7 +20,7 @@ export function getEventDate(event: { dayOfWeek: number; startTime: string }) {
 }
 
 export async function getEvents() {
-  return db.select().from(events)
+  return db.select().from(events).orderBy(events.id)
 }
 
 export async function getEventById(id: number) {

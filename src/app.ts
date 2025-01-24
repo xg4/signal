@@ -10,6 +10,7 @@ import { HTTPException } from 'hono/http-exception'
 import type { JwtVariables } from 'hono/jwt'
 import { jwt } from 'hono/jwt'
 import { logger } from 'hono/logger'
+import { ZodError } from 'zod'
 import { ProcessEnv } from './env'
 import {
   authRoute,
@@ -22,8 +23,8 @@ import {
 } from './routes'
 import { initSchedules } from './services/schedules'
 
-dayjs.extend(relativeTime)
 dayjs.locale('zh-cn')
+dayjs.extend(relativeTime)
 dayjs.extend(utc)
 dayjs.extend(timezone)
 dayjs.extend(duration)
@@ -42,6 +43,10 @@ app.onError((err, c) => {
   if (err instanceof HTTPException) {
     return c.json({ message: err.message }, err.status)
   }
+  if (err instanceof ZodError) {
+    return c.json({ message: err.message }, 400)
+  }
+
   console.error('🚀 ~ app.onError ~ onError:', err)
   return c.json({ message: 'Internal Server Error' }, 500)
 })
