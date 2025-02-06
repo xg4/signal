@@ -37,7 +37,7 @@ export async function login(data: LoginData) {
       userId: user.id,
       username: user.username,
       nickname: user.nickname,
-      exp: dayjs().add(7, 'day').unix(),
+      exp: dayjs().add(1, 'month').unix(),
       iat: dayjs().unix(),
     },
     ProcessEnv.JWT_SECRET,

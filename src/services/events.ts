@@ -79,6 +79,11 @@ export async function importEvents(jsonData: z.infer<typeof createEventSchema>[]
     }),
   )
 
+  const errors = tasks.filter(t => t.status === 'rejected').map(i => i.reason)
+  if (errors.length) {
+    console.log('🚀 ~ importEvents ~ error:', ...errors)
+  }
+
   console.log(
     '🚀 ~ importEvents ~ all:',
     jsonData.length,

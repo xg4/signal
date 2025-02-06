@@ -8,7 +8,7 @@ export const createEventSchema = z.object({
   description: z.string().optional().nullable(),
   dayOfWeek: z.number(),
   startTime: z.string(),
-  durationMinutes: z.number(),
+  durationMinutes: z.number().default(10),
   notifyMinutes: z.array(z.number()).optional(),
   locations: z.array(z.string()).optional(),
 })
@@ -19,7 +19,13 @@ const fileSchema = z.object({
 
 // v2 路由
 export const eventsRouteV2 = new Hono()
-  .post('/json', async c => {
+  .post('/json', zValidator('json', createEventSchema.array().min(1)), async c => {
+    const jsonData = c.req.valid('json')
+
+    await importEvents(jsonData)
+    return c.json({ message: '更新成功' })
+  })
+  .post('/file', async c => {
     const { file } = await c.req.parseBody().then(fileSchema.parse)
 
     const content = await file.text().then(JSON.parse)
