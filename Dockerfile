@@ -2,24 +2,28 @@
 
 FROM node:22-alpine AS base
 
-FROM base AS deps
+FROM base AS base2
 RUN apk add --no-cache libc6-compat
+RUN npm i -g pnpm
+
+FROM base2 AS deps
 WORKDIR /app
 
-COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* .npmrc* ./
-RUN \
-  if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
-  elif [ -f package-lock.json ]; then npm ci; \
-  elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm i --frozen-lockfile; \
-  else echo "Lockfile not found." && exit 1; \
-  fi
+COPY package.json pnpm-lock.yaml* .npmrc* ./
+RUN pnpm i --frozen-lockfile
 
+FROM base2 AS deps2
+WORKDIR /app
 
-# Rebuild the source code only when needed
+COPY package.json pnpm-lock.yaml* .npmrc* ./
+RUN pnpm i --prod
+
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+RUN npm run build
 
 FROM base AS runner
 WORKDIR /app
@@ -27,11 +31,15 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN adduser --system --uid 1001 nodejs
 
-COPY --from=builder /app ./
+COPY --from=deps2 --chown=nodejs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nodejs:nodejs /app/package.json ./package.json
+COPY --from=builder --chown=nodejs:nodejs /app/drizzle ./drizzle
+COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nodejs:nodejs /app/drizzle.config.ts ./drizzle.config.ts
 
-USER nextjs
+USER nodejs
 
 EXPOSE 3789
 

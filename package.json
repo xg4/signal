@@ -1,26 +1,36 @@
 {
   "name": "signal",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/xg4/signal#readme",
+  "bugs": {
+    "url": "https://github.com/xg4/signal/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xg4/signal.git"
+  },
+  "license": "MIT",
+  "author": "xg4 <xingor4@gmail.com>",
   "type": "module",
+  "main": "dist/index.js",
   "scripts": {
+    "build": "tsx scripts/build.ts",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "dev": "tsx watch --env-file=.env src/index.ts",
-    "start": "drizzle-kit migrate && tsx src/index.ts"
+    "start": "drizzle-kit migrate && node dist/index.js"
   },
   "dependencies": {
-    "@hono/node-server": "1.13.8",
-    "@hono/zod-validator": "0.4.2",
-    "bcryptjs": "2.4.3",
     "cron": "3.5.0",
-    "dayjs": "1.11.13",
+    "drizzle-kit": "0.30.4",
     "drizzle-orm": "0.39.2",
-    "hono": "4.6.20",
-    "lodash-es": "4.17.21",
     "pg": "8.13.1",
-    "web-push": "3.6.7",
-    "zod": "3.24.1"
+    "web-push": "3.6.7"
   },
   "devDependencies": {
+    "@hono/node-server": "1.13.8",
+    "@hono/zod-validator": "0.4.2",
     "@tsconfig/node20": "20.1.4",
     "@tsconfig/strictest": "2.0.5",
     "@types/bcryptjs": "2.4.6",
@@ -28,8 +38,13 @@
     "@types/node": "22.13.1",
     "@types/pg": "8.11.11",
     "@types/web-push": "3.6.4",
-    "drizzle-kit": "0.30.4",
+    "bcryptjs": "2.4.3",
+    "dayjs": "1.11.13",
+    "esbuild": "0.24.2",
+    "hono": "4.6.20",
+    "lodash-es": "4.17.21",
     "prettier": "3.4.2",
-    "tsx": "4.19.2"
+    "tsx": "4.19.2",
+    "zod": "3.24.1"
   }
 }
