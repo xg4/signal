@@ -1,8 +1,7 @@
 import { CronJob } from 'cron'
 import dayjs from 'dayjs'
+import { eventService, notificationService } from '.'
 import { events } from '../db/schema'
-import { getEventDate, getEvents } from './events'
-import { sendToAll } from './notifications'
 
 const cronJobs = new Map<number, CronJob[]>()
 
@@ -32,7 +31,7 @@ export function updateSchedule(event: typeof events.$inferSelect) {
     return
   }
 
-  const eventDate = getEventDate(event)
+  const eventDate = eventService.getEventDate(event)
 
   // 为每个通知时间创建定时任务
   const jobs = event.notifyMinutes.map(minutes => {
@@ -46,7 +45,7 @@ export function updateSchedule(event: typeof events.$inferSelect) {
           const diff = eventDate.diff(dayjs(), 'minute')
           const title = [event.name, diff <= 1 ? '开始' : eventDate.fromNow() + '即将开始'].join(' - ')
           const body = event.locations.join(' - ') || event.description || ''
-          await sendToAll(title, body)
+          await notificationService.sendToAll(title, body)
         } catch (error) {
           console.error('🚀 ~ sendToAll ~ error:', event.id, error)
         }
@@ -66,7 +65,7 @@ export function updateSchedule(event: typeof events.$inferSelect) {
 
 // 初始化所有活动的定时任务
 export async function initSchedules() {
-  const allEvents = await getEvents()
+  const allEvents = await eventService.getEvents()
   const allJobs = allEvents.map(event => updateSchedule(event))
   console.log('🚀 ~ initSchedules ~ allJobs:', allJobs.flat().length)
 }

@@ -1,13 +1,28 @@
 import { eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
+import { notificationService } from '.'
 import { db } from '../db/config'
 import { subscriptions } from '../db/schema'
-import { subscriptionSchema } from '../routes/subscriptions'
 import { generateSubscriptionKey } from '../utils/crypto'
-import { sendByDeviceCode } from './notifications'
 
 export type Subscription = z.infer<typeof subscriptionSchema>['subscription']
+
+export const subscriptionSchema = z.object({
+  subscription: z.object({
+    endpoint: z
+      .string({
+        message: '无效的订阅链接',
+      })
+      .url({
+        message: '无效的订阅链接',
+      }),
+    keys: z.object({
+      auth: z.string(),
+      p256dh: z.string(),
+    }),
+  }),
+})
 
 export async function getSubscriptions() {
   return db
@@ -39,7 +54,7 @@ export async function createSubscription(subscription: Subscription) {
   })
 
   try {
-    await sendByDeviceCode(deviceCode, '订阅成功', '您已成功订阅所有活动通知')
+    await notificationService.sendByDeviceCode(deviceCode, '订阅成功', '您已成功订阅所有活动通知')
   } catch (error) {
     console.error('发送欢迎通知失败:', error)
   }

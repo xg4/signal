@@ -8,20 +8,10 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
 import type { JwtVariables } from 'hono/jwt'
-import { jwt } from 'hono/jwt'
 import { logger } from 'hono/logger'
 import { ZodError } from 'zod'
-import { ProcessEnv } from './env'
-import {
-  authRoute,
-  eventsRoute,
-  eventsRouteV2,
-  notificationsRouteV2,
-  schedulesRouteV2,
-  subscriptionsRoute,
-  subscriptionsRouteV2,
-} from './routes'
-import { initSchedules } from './services/schedules'
+import { routes } from './routes'
+import { scheduleService } from './services'
 
 dayjs.locale('zh-cn')
 dayjs.extend(relativeTime)
@@ -29,7 +19,7 @@ dayjs.extend(utc)
 dayjs.extend(timezone)
 dayjs.extend(duration)
 
-initSchedules()
+scheduleService.initSchedules()
 
 type Variables = JwtVariables
 
@@ -44,27 +34,14 @@ app.onError((err, c) => {
     return c.json({ message: err.message }, err.status)
   }
   if (err instanceof ZodError) {
-    return c.json({ message: err.message }, 400)
+    const [e] = err.errors
+    return c.json(e ? e : { message: err.message }, 400)
   }
 
   console.error('🚀 ~ app.onError ~ onError:', err)
   return c.json({ message: 'Internal Server Error' }, 500)
 })
 
-app
-  .basePath('/api')
-  .route('/auth', authRoute)
-  .route('/subscriptions', subscriptionsRoute)
-  .route('/events', eventsRoute)
-  .basePath('/v2')
-  .use(
-    jwt({
-      secret: ProcessEnv.JWT_SECRET,
-    }),
-  )
-  .route('/schedules', schedulesRouteV2)
-  .route('/events', eventsRouteV2)
-  .route('/subscriptions', subscriptionsRouteV2)
-  .route('/notifications', notificationsRouteV2)
+app.route('/', routes)
 
 export default app

@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { db } from '../db/config'
 import { users } from '../db/schema'
 import { ProcessEnv } from '../env'
-import { comparePassword } from '../utils/auth'
+import { comparePassword, hashPassword } from '../utils/pwd'
 
 export const loginSchema = z.object({
   username: z.string(),
@@ -36,7 +36,6 @@ export async function login(data: LoginData) {
     {
       userId: user.id,
       username: user.username,
-      nickname: user.nickname,
       exp: dayjs().add(1, 'month').unix(),
       iat: dayjs().unix(),
     },
@@ -45,10 +44,59 @@ export async function login(data: LoginData) {
 
   return {
     token,
-    user: {
-      id: user.id,
-      username: user.username,
-      nickname: user.nickname,
-    },
   }
+}
+
+export async function createUser(data: LoginData) {
+  const { username, password } = data
+
+  // 查询用户
+  const [user] = await db.select().from(users).where(eq(users.username, username))
+
+  if (user) {
+    throw new HTTPException(401, { message: '用户名已存在' })
+  }
+
+  const hashedPwd = await hashPassword(password)
+
+  const [newUser] = await db
+    .insert(users)
+    .values({
+      username,
+      password: hashedPwd,
+    })
+    .returning()
+
+  if (!newUser) {
+    throw new HTTPException()
+  }
+
+  // 签发 JWT token
+  const token = await sign(
+    {
+      userId: newUser.id,
+      username: newUser.username,
+      exp: dayjs().add(1, 'month').unix(),
+      iat: dayjs().unix(),
+    },
+    ProcessEnv.JWT_SECRET,
+  )
+
+  return {
+    token,
+  }
+}
+
+export async function getUserById(id: number) {
+  const [user] = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      nickname: users.nickname,
+      createdAt: users.createdAt,
+    })
+    .from(users)
+    .where(eq(users.id, id))
+    .limit(1)
+  return user
 }

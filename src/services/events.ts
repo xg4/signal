@@ -2,10 +2,23 @@ import dayjs from 'dayjs'
 import { and, eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
+import { scheduleService } from '.'
 import { db } from '../db/config'
 import { events } from '../db/schema'
-import { createEventSchema } from '../routes/v2/events'
-import { deleteCronJob, updateSchedule } from './schedules'
+
+export const createEventSchema = z.object({
+  name: z.string({
+    message: '无效的活动名称',
+  }),
+  description: z.string().optional().nullable(),
+  dayOfWeek: z.number().min(0).max(6),
+  startTime: z.string({
+    message: '无效的开始时间',
+  }),
+  durationMinutes: z.number().default(10),
+  notifyMinutes: z.array(z.number()).optional(),
+  locations: z.array(z.string()).optional(),
+})
 
 export function setDayOfWeek(dayOfWeek: number) {
   const now = dayjs()
@@ -29,9 +42,23 @@ export async function getEventById(id: number) {
 }
 
 export async function createEvent(eventData: z.infer<typeof createEventSchema>) {
+  const [currentEvent] = await db
+    .select()
+    .from(events)
+    .where(
+      and(
+        eq(events.name, eventData.name),
+        eq(events.dayOfWeek, eventData.dayOfWeek),
+        eq(events.startTime, eventData.startTime),
+      ),
+    )
+    .limit(1)
+  if (currentEvent) {
+    throw new HTTPException(400, { message: '活动已存在' })
+  }
   const [newEvent] = await db.insert(events).values(eventData).returning()
   if (newEvent) {
-    updateSchedule(newEvent)
+    scheduleService.updateSchedule(newEvent)
   }
   return newEvent
 }
@@ -46,7 +73,7 @@ export async function updateEvent(id: number, eventData: z.infer<typeof createEv
   const [updatedEvent] = await db.update(events).set(eventData).where(eq(events.id, id)).returning()
 
   if (updatedEvent) {
-    updateSchedule(updatedEvent)
+    scheduleService.updateSchedule(updatedEvent)
   }
   return updatedEvent
 }
@@ -60,7 +87,7 @@ export async function deleteEvent(id: number) {
 
   await db.delete(events).where(eq(events.id, id))
 
-  deleteCronJob(id)
+  scheduleService.deleteCronJob(id)
 }
 
 export async function importEvents(jsonData: z.infer<typeof createEventSchema>[]) {
