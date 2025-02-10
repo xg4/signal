@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { db } from '../db/config'
 import { users } from '../db/schema'
 import { ProcessEnv } from '../env'
-import { comparePassword, hashPassword } from '../utils/pwd'
+import { comparePassword, hashPassword } from '../utils/crypto'
 
 export const loginSchema = z.object({
   username: z.string(),

@@ -4,9 +4,7 @@ import { z } from 'zod'
 import { notificationService } from '.'
 import { db } from '../db/config'
 import { subscriptions } from '../db/schema'
-import { generateSubscriptionKey } from '../utils/crypto'
-
-export type Subscription = z.infer<typeof subscriptionSchema>['subscription']
+import { sha256 } from '../utils/crypto'
 
 export const subscriptionSchema = z.object({
   subscription: z.object({
@@ -23,6 +21,12 @@ export const subscriptionSchema = z.object({
     }),
   }),
 })
+
+export type Subscription = z.infer<typeof subscriptionSchema>['subscription']
+
+export function generateSubscriptionKey(subscription: Subscription) {
+  return sha256([subscription.endpoint, subscription.keys.auth, subscription.keys.p256dh].join('|'))
+}
 
 export async function getSubscriptions() {
   return db
