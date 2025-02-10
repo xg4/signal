@@ -8,8 +8,8 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
 import type { JwtVariables } from 'hono/jwt'
-import { logger } from 'hono/logger'
 import { ZodError } from 'zod'
+import { logger } from './middlewares/logger'
 import { routes } from './routes'
 import { scheduleService } from './services'
 
@@ -23,14 +23,13 @@ scheduleService.initSchedules()
 
 type Variables = JwtVariables
 
-const app = new Hono<{ Variables: Variables }>().use(cors()).use(
-  logger((msg: string) => {
-    console.log(dayjs().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss'), msg)
-  }),
-)
+const app = new Hono<{ Variables: Variables }>().use(cors()).use(logger)
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {
+    if (err.status === 401) {
+      return c.json({ message: '未登录' }, err.status)
+    }
     return c.json({ message: err.message }, err.status)
   }
   if (err instanceof ZodError) {
