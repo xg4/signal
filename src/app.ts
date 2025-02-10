@@ -7,7 +7,6 @@ import utc from 'dayjs/plugin/utc'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
-import type { JwtVariables } from 'hono/jwt'
 import { ZodError } from 'zod'
 import { logger } from './middlewares/logger'
 import { routes } from './routes'
@@ -21,9 +20,7 @@ dayjs.extend(duration)
 
 scheduleService.initSchedules()
 
-type Variables = JwtVariables
-
-const app = new Hono<{ Variables: Variables }>().use(cors()).use(logger)
+const app = new Hono().use(cors()).use(logger)
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {

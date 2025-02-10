@@ -5,7 +5,7 @@ build({
   entryPoints: ['src/index.ts'],
   outdir: 'dist',
   platform: 'node',
-  target: 'node22',
+  target: 'node20',
   format: 'esm',
   bundle: true,
   minify: true,
