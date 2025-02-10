@@ -15,7 +15,7 @@ export const createEventSchema = z.object({
   startTime: z.string({
     message: '无效的开始时间',
   }),
-  durationMinutes: z.number().default(10),
+  durationMinutes: z.number().optional(),
   notifyMinutes: z.array(z.number()).optional(),
   locations: z.array(z.string()).optional(),
 })

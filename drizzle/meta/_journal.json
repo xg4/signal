@@ -57,6 +57,13 @@
       "when": 1737514440049,
       "tag": "0007_perpetual_red_ghost",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1739181309477,
+      "tag": "0008_friendly_the_twelve",
+      "breakpoints": true
     }
   ]
 }

@@ -9,7 +9,7 @@ export const events = pgTable(
     description: text('description'),
     dayOfWeek: integer('day_of_week').notNull(), // 0-6 表示周日到周六
     startTime: time('start_time').notNull(),
-    durationMinutes: integer('duration_minutes').notNull(),
+    durationMinutes: integer('duration_minutes').default(0),
     notifyMinutes: integer('notify_minutes').array().notNull().default([]),
     locations: text('locations').array().notNull().default([]),
     createdAt: timestamp('created_at').notNull().defaultNow(),
