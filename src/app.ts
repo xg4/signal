@@ -10,15 +10,12 @@ import { HTTPException } from 'hono/http-exception'
 import { ZodError } from 'zod'
 import { logger } from './middlewares/logger'
 import { routes } from './routes'
-import { scheduleService } from './services'
 
 dayjs.locale('zh-cn')
 dayjs.extend(relativeTime)
 dayjs.extend(utc)
 dayjs.extend(timezone)
 dayjs.extend(duration)
-
-scheduleService.initSchedules()
 
 const app = new Hono().use(cors()).use(logger)
 

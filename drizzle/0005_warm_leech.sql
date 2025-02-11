@@ -1,1 +1,0 @@
-ALTER TABLE "events" ADD COLUMN "locations" text[] DEFAULT '{}' NOT NULL;

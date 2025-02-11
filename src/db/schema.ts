@@ -1,51 +1,55 @@
-import { integer, pgTable, serial, text, time, timestamp, unique } from 'drizzle-orm/pg-core'
+import { integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core'
 
 // 活动表
-export const events = pgTable(
+export const events = sqliteTable(
   'events',
   {
-    id: serial('id').primaryKey(),
+    id: integer('id').primaryKey(),
     name: text('name').notNull(),
     description: text('description'),
     dayOfWeek: integer('day_of_week').notNull(), // 0-6 表示周日到周六
-    startTime: time('start_time').notNull(),
+    startTime: text('start_time').notNull(),
     durationMinutes: integer('duration_minutes').default(0),
-    notifyMinutes: integer('notify_minutes').array().notNull().default([]),
-    locations: text('locations').array().notNull().default([]),
-    createdAt: timestamp('created_at').notNull().defaultNow(),
-    updatedAt: timestamp('updated_at')
+    notifyMinutes: text('notify_minutes', { mode: 'json' }).$type<number[]>().notNull().default([]),
+    locations: text('locations', { mode: 'json' }).$type<string[]>().notNull().default([]),
+    createdAt: integer('created_at', { mode: 'timestamp' })
       .notNull()
-      .defaultNow()
+      .$default(() => new Date()),
+    updatedAt: integer('updated_at', { mode: 'timestamp' })
+      .notNull()
+      .$default(() => new Date())
       .$onUpdate(() => new Date()),
   },
-  t => ({
-    unique: unique().on(t.name, t.dayOfWeek, t.startTime),
-  }),
+  t => [unique().on(t.name, t.dayOfWeek, t.startTime)],
 )
 
 // 订阅表
-export const subscriptions = pgTable('subscriptions', {
-  id: serial('id').primaryKey(),
+export const subscriptions = sqliteTable('subscriptions', {
+  id: integer('id').primaryKey(),
   endpoint: text('endpoint').notNull(),
   auth: text('auth').notNull(),
   p256dh: text('p256dh').notNull(),
   deviceCode: text('device_code').notNull(),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at')
+  createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
-    .defaultNow()
+    .$default(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .notNull()
+    .$default(() => new Date())
     .$onUpdate(() => new Date()),
 })
 
 // 用户表
-export const users = pgTable('users', {
-  id: serial('id').primaryKey(),
+export const users = sqliteTable('users', {
+  id: integer('id').primaryKey(),
   username: text('username').notNull().unique(),
-  password: text('password').notNull(), // 存储加密后的密码
+  password: text('password').notNull(),
   nickname: text('nickname'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at')
+  createdAt: integer('created_at', { mode: 'timestamp' })
     .notNull()
-    .defaultNow()
+    .$default(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .notNull()
+    .$default(() => new Date())
     .$onUpdate(() => new Date()),
 })

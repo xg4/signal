@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { notificationService } from '.'
-import { db } from '../db/config'
+import { db } from '../db'
 import { subscriptions } from '../db/schema'
 import { sha256 } from '../utils/crypto'
 

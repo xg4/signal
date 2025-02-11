@@ -1,68 +1,12 @@
 {
   "version": "7",
-  "dialect": "postgresql",
+  "dialect": "sqlite",
   "entries": [
     {
       "idx": 0,
-      "version": "7",
-      "when": 1736678305513,
-      "tag": "0000_glamorous_franklin_storm",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1736735797359,
-      "tag": "0001_puzzling_maverick",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1736741959907,
-      "tag": "0002_silly_kate_bishop",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1736746007772,
-      "tag": "0003_serious_dark_phoenix",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1737009018346,
-      "tag": "0004_easy_the_stranger",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1737009363576,
-      "tag": "0005_warm_leech",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1737018240199,
-      "tag": "0006_redundant_karnak",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1737514440049,
-      "tag": "0007_perpetual_red_ghost",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1739181309477,
-      "tag": "0008_friendly_the_twelve",
+      "version": "6",
+      "when": 1739244930906,
+      "tag": "0000_rich_saracen",
       "breakpoints": true
     }
   ]

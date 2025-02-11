@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { scheduleService } from '.'
-import { db } from '../db/config'
+import { db } from '../db'
 import { events } from '../db/schema'
 
 export const createEventSchema = z.object({

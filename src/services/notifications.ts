@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import webpush from 'web-push'
-import { db } from '../db/config'
+import { db } from '../db'
 import { subscriptions } from '../db/schema'
 import { ProcessEnv } from '../env'
 

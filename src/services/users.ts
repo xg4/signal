@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { sign } from 'hono/jwt'
 import { z } from 'zod'
-import { db } from '../db/config'
+import { db } from '../db'
 import { users } from '../db/schema'
 import { ProcessEnv } from '../env'
 import { comparePassword, hashPassword } from '../utils/crypto'
@@ -54,7 +54,7 @@ export async function createUser(data: LoginData) {
   const [user] = await db.select().from(users).where(eq(users.username, username))
 
   if (user) {
-    throw new HTTPException(401, { message: '用户名已存在' })
+    throw new HTTPException(400, { message: '用户名已存在' })
   }
 
   const hashedPwd = await hashPassword(password)
@@ -99,4 +99,15 @@ export async function getUserById(id: number) {
     .where(eq(users.id, id))
     .limit(1)
   return user
+}
+
+export async function getUsers() {
+  return db
+    .select({
+      id: users.id,
+      username: users.username,
+      nickname: users.nickname,
+      createdAt: users.createdAt,
+    })
+    .from(users)
 }

@@ -1,1 +1,0 @@
-ALTER TABLE "events" ADD COLUMN "notify_minutes" integer[] DEFAULT '{0,5,30}' NOT NULL;
