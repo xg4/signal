@@ -1,4 +1,4 @@
-import { MiddlewareHandler } from 'hono'
+import type { MiddlewareHandler } from 'hono'
 import { every } from 'hono/combine'
 import { HTTPException } from 'hono/http-exception'
 import { jwt } from 'hono/jwt'
@@ -12,7 +12,7 @@ export const userRequired = jwt({
 export const adminRequired: MiddlewareHandler = every(userRequired, async (c, next) => {
   const { userId } = c.get('jwtPayload')
   const user = await userService.getUserById(userId)
-  if (!user) {
+  if (!user || !user.isAdmin) {
     throw new HTTPException(403, { message: '无权限访问' })
   }
   await next()

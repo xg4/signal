@@ -94,6 +94,7 @@ export async function getUserById(id: number) {
       username: users.username,
       nickname: users.nickname,
       createdAt: users.createdAt,
+      isAdmin: users.isAdmin,
     })
     .from(users)
     .where(eq(users.id, id))

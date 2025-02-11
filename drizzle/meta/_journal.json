@@ -8,6 +8,13 @@
       "when": 1739244930906,
       "tag": "0000_rich_saracen",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1739251279843,
+      "tag": "0001_worthless_norman_osborn",
+      "breakpoints": true
     }
   ]
 }

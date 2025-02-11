@@ -1,5 +1,5 @@
 import dayjs from 'dayjs'
-import { MiddlewareHandler } from 'hono'
+import type { MiddlewareHandler } from 'hono'
 import ms from 'ms'
 
 export const logger: MiddlewareHandler = async (c, next) => {
