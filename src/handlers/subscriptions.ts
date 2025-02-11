@@ -32,6 +32,13 @@ export const getSubscriptionByDeviceCode = async (c: Context) => {
   return c.json(!!exists)
 }
 
+export const updateSubscriptionByDeviceCode = async (c: Context) => {
+  const { code } = deviceCodeSchema.parse(c.req.param())
+  const data = await subscriptionService.updateSchema.promise().parse(c.req.json())
+  const current = await subscriptionService.updateSubscriptionByDeviceCode(code, data)
+  return c.json(current)
+}
+
 export const deleteSubscription = async (c: Context) => {
   const { code } = deviceCodeSchema.parse(c.req.param())
   await subscriptionService.deleteSubscription(code)

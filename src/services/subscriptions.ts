@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import { createInsertSchema } from 'drizzle-zod'
+import { createInsertSchema, createUpdateSchema } from 'drizzle-zod'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { notificationService } from '.'
@@ -55,6 +55,14 @@ export async function createSubscriptionByJSON(list: z.infer<typeof createSubscr
           ...item,
           deviceCode,
         })
+      } else {
+        await db
+          .update(subscriptions)
+          .set({
+            ...item,
+            deviceCode,
+          })
+          .where(eq(subscriptions.deviceCode, deviceCode))
       }
 
       return deviceCode
@@ -69,12 +77,28 @@ export function generateSubscriptionKey(subscription: Subscription) {
 }
 
 export async function getSubscriptions() {
-  return db.select().from(subscriptions)
+  return db.select().from(subscriptions).orderBy(subscriptions.createdAt)
 }
 
 export async function getSubscriptionByDeviceCode(deviceCode: string) {
   const [subscription] = await db.select().from(subscriptions).where(eq(subscriptions.deviceCode, deviceCode)).limit(1)
   return subscription
+}
+
+export const updateSchema = createUpdateSchema(subscriptions, {
+  endpoint: s => s.url(),
+  deviceCode: s => s.optional(),
+  createdAt: () => dateLikeToDate.optional(),
+  updatedAt: () => dateLikeToDate.optional(),
+})
+
+export async function updateSubscriptionByDeviceCode(deviceCode: string, data: z.infer<typeof updateSchema>) {
+  const existingSubscription = await getSubscriptionByDeviceCode(deviceCode)
+  if (!existingSubscription) {
+    throw new HTTPException(404, { message: '订阅不存在' })
+  }
+
+  return await db.update(subscriptions).set(data).where(eq(subscriptions.deviceCode, deviceCode)).returning()
 }
 
 export async function createSubscription(subscription: Subscription) {
