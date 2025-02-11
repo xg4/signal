@@ -4,6 +4,7 @@ import { authMiddleware } from '../middlewares'
 
 export const subscriptionRouter = new Hono()
   .get('/subscriptions/:code', subscriptionHandler.getSubscriptionByDeviceCode)
+  .post('/subscriptions/json', authMiddleware.adminRequired, subscriptionHandler.createSubscriptionByJSON)
   .post('/subscriptions', subscriptionHandler.createSubscription)
   .delete('/subscriptions/:code', subscriptionHandler.deleteSubscription)
   .get('/subscriptions', authMiddleware.adminRequired, subscriptionHandler.getAllSubscriptions)

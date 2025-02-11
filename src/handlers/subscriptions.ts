@@ -12,8 +12,15 @@ const deviceCodeSchema = z.object({
     }), // SHA-256 哈希值长度为 64 个字符
 })
 
+export const createSubscriptionByJSON = async (c: Context) => {
+  const data = await subscriptionService.createSubscriptionsSchema.array().min(1).promise().parse(c.req.json())
+
+  const deviceCode = await subscriptionService.createSubscriptionByJSON(data)
+  return c.json(deviceCode, { status: 201 })
+}
+
 export const createSubscription = async (c: Context) => {
-  const { subscription } = await subscriptionService.subscriptionSchema.promise().parse(c.req.json())
+  const { subscription } = await subscriptionService.createSubscriptionSchema.promise().parse(c.req.json())
 
   const deviceCode = await subscriptionService.createSubscription(subscription)
   return c.json(deviceCode, { status: 201 })

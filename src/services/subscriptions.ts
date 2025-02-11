@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm'
+import { createInsertSchema } from 'drizzle-zod'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { notificationService } from '.'
@@ -7,33 +8,68 @@ import { subscriptions } from '../db/schema'
 import { sha256 } from '../utils/crypto'
 
 export const subscriptionSchema = z.object({
-  subscription: z.object({
-    endpoint: z
-      .string({
-        message: '无效的订阅链接',
-      })
-      .url({
-        message: '无效的订阅链接',
-      }),
-    keys: z.object({
-      auth: z.string(),
-      p256dh: z.string(),
+  endpoint: z
+    .string({
+      message: '无效的订阅链接',
+    })
+    .url({
+      message: '无效的订阅链接',
     }),
+  keys: z.object({
+    auth: z.string(),
+    p256dh: z.string(),
   }),
 })
 
-export type Subscription = z.infer<typeof subscriptionSchema>['subscription']
+export const createSubscriptionSchema = z.object({
+  subscription: subscriptionSchema,
+})
+
+const dateLike = z.union([z.number(), z.string(), z.date()])
+const dateLikeToDate = dateLike.pipe(z.coerce.date())
+
+export const createSubscriptionsSchema = createInsertSchema(subscriptions, {
+  endpoint: s => s.url(),
+  deviceCode: s => s.optional(),
+  createdAt: () => dateLikeToDate.optional(),
+  updatedAt: () => dateLikeToDate.optional(),
+})
+
+export type Subscription = z.infer<typeof subscriptionSchema>
+
+export async function createSubscriptionByJSON(list: z.infer<typeof createSubscriptionsSchema>[]) {
+  const result = await Promise.all(
+    list.map(async item => {
+      const deviceCode = await generateSubscriptionKey({
+        endpoint: item.endpoint,
+        keys: {
+          auth: item.auth,
+          p256dh: item.p256dh,
+        },
+      })
+
+      // 检查是否已经订阅
+      const existingSubscription = await getSubscriptionByDeviceCode(deviceCode)
+      if (!existingSubscription) {
+        await db.insert(subscriptions).values({
+          ...item,
+          deviceCode,
+        })
+      }
+
+      return deviceCode
+    }),
+  )
+
+  return result
+}
 
 export function generateSubscriptionKey(subscription: Subscription) {
   return sha256([subscription.endpoint, subscription.keys.auth, subscription.keys.p256dh].join('|'))
 }
 
 export async function getSubscriptions() {
-  return db
-    .select({
-      deviceCode: subscriptions.deviceCode,
-    })
-    .from(subscriptions)
+  return db.select().from(subscriptions)
 }
 
 export async function getSubscriptionByDeviceCode(deviceCode: string) {
