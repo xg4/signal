@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm'
+import { get } from 'lodash-es'
 import webpush from 'web-push'
 import { db } from '../db'
 import { subscriptions } from '../db/schema'
@@ -43,10 +44,13 @@ export async function sendToAll(title: string, body: string) {
         )
         console.log(`成功发送通知给订阅者 ${sub.id}`)
       } catch (error) {
-        console.error('发送通知失败:', error)
-        if (error instanceof Error && 'statusCode' in error && error.statusCode === 410) {
-          await db.delete(subscriptions).where(eq(subscriptions.id, sub.id))
-          console.log(`已删除失效的订阅: ${sub.id}`)
+        console.error('发送通知失败:', sub.id, error)
+        if (error instanceof Error) {
+          const statusCode: any = get(error, 'statusCode')
+          if ([410, 404].includes(statusCode)) {
+            await db.delete(subscriptions).where(eq(subscriptions.id, sub.id))
+            console.log(`已删除失效的订阅: ${sub.id}`)
+          }
         }
       }
     }),

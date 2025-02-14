@@ -22,13 +22,13 @@ export async function login(data: LoginData) {
   const [user] = await db.select().from(users).where(eq(users.username, username))
 
   if (!user) {
-    throw new HTTPException(401, { message: '用户名或密码错误' })
+    throw new HTTPException(400, { message: '用户名或密码错误' })
   }
 
   // 验证密码
   const isValidPassword = await comparePassword(password, user.password)
   if (!isValidPassword) {
-    throw new HTTPException(401, { message: '用户名或密码错误' })
+    throw new HTTPException(400, { message: '用户名或密码错误' })
   }
 
   // 签发 JWT token
