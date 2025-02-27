@@ -21,6 +21,7 @@
     "start": "bun run --env-file=.env dist/index.js"
   },
   "dependencies": {
+    "@hono/zod-validator": "^0.4.3",
     "cron": "4.1.0",
     "dayjs": "1.11.13",
     "drizzle-orm": "0.40.0",

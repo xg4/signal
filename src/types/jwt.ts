@@ -1,4 +1,4 @@
-import { JwtVariables } from 'hono/jwt'
+import type { JwtVariables } from 'hono/jwt'
 
 export type JwtUser = {
   userId: number

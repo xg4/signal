@@ -1,5 +1,0 @@
-export * as eventHandler from './events'
-export * as notificationHandler from './notifications'
-export * as scheduleHandler from './schedules'
-export * as subscriptionHandler from './subscriptions'
-export * as userHandler from './users'

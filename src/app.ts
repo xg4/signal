@@ -7,6 +7,7 @@ import utc from 'dayjs/plugin/utc'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
+import { requestId } from 'hono/request-id'
 import { ZodError } from 'zod'
 import { pinoLogger } from './middlewares/logger'
 import { routes } from './routes'
@@ -17,7 +18,7 @@ dayjs.extend(utc)
 dayjs.extend(timezone)
 dayjs.extend(duration)
 
-const app = new Hono().use(cors()).use(pinoLogger)
+const app = new Hono().use(cors()).use(requestId()).use(pinoLogger)
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {

@@ -4,11 +4,11 @@ import { db } from './db'
 import { ProcessEnv } from './env'
 import { scheduleService } from './services'
 
-const port = ProcessEnv.PORT
-
 await migrate(db, { migrationsFolder: './drizzle' })
 
 await scheduleService.initSchedules()
+
+const port = ProcessEnv.PORT
 
 Bun.serve({
   fetch: app.fetch,

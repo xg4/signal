@@ -6,7 +6,9 @@ import { scheduleService } from '.'
 import { db } from '../db'
 import { events } from '../db/schema'
 
-export const createEventSchema = z.object({
+export const eventIdSchema = z.coerce.number().int()
+
+export const eventInsetSchema = z.object({
   name: z.string({
     message: '无效的活动名称',
   }),
@@ -41,7 +43,7 @@ export async function getEventById(id: number) {
   return event
 }
 
-export async function createEvent(eventData: z.infer<typeof createEventSchema>) {
+export async function createEvent(eventData: z.infer<typeof eventInsetSchema>) {
   const [currentEvent] = await db
     .select()
     .from(events)
@@ -63,7 +65,7 @@ export async function createEvent(eventData: z.infer<typeof createEventSchema>) 
   return newEvent
 }
 
-export async function updateEvent(id: number, eventData: z.infer<typeof createEventSchema>) {
+export async function updateEvent(id: number, eventData: z.infer<typeof eventInsetSchema>) {
   const [existingEvent] = await db.select().from(events).where(eq(events.id, id)).limit(1)
 
   if (!existingEvent) {
@@ -90,7 +92,7 @@ export async function deleteEvent(id: number) {
   scheduleService.deleteCronJob(id)
 }
 
-export async function importEvents(jsonData: z.infer<typeof createEventSchema>[]) {
+export async function importEvents(jsonData: z.infer<typeof eventInsetSchema>[]) {
   const tasks = await Promise.allSettled(
     jsonData.map(async e => {
       const [currentEvent] = await db
