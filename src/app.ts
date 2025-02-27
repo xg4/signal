@@ -8,7 +8,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
 import { ZodError } from 'zod'
-import { logger } from './middlewares/logger'
+import { pinoLogger } from './middlewares/logger'
 import { routes } from './routes'
 
 dayjs.locale('zh-cn')
@@ -17,7 +17,7 @@ dayjs.extend(utc)
 dayjs.extend(timezone)
 dayjs.extend(duration)
 
-const app = new Hono().use(cors()).use(logger)
+const app = new Hono().use(cors()).use(pinoLogger)
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {
@@ -31,7 +31,7 @@ app.onError((err, c) => {
     return c.json(e ? e : { message: err.message }, 400)
   }
 
-  console.error('🚀 ~ app.onError ~ onError:', err)
+  c.var.logger.error('🚀 ~ app.onError:', err)
   return c.json({ message: 'Internal Server Error' }, 500)
 })
 
