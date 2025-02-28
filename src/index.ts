@@ -1,18 +1,18 @@
-import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
+import { migrate } from 'drizzle-orm/bun-sql/migrator'
 import app from './app'
 import { db } from './db'
 import { ProcessEnv } from './env'
-import { scheduleService } from './services'
+import { schedulesService } from './services'
+import { initWebPush } from './utils/notifications'
 
 await migrate(db, { migrationsFolder: './drizzle' })
 
-await scheduleService.initSchedules()
+await initWebPush()
+await schedulesService.initScheduler()
 
 const port = ProcessEnv.PORT
 
-Bun.serve({
+export default {
   fetch: app.fetch,
   port,
-})
-
-console.log(`🚀 Server is running on http://localhost:${port}`)
+}

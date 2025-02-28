@@ -9,8 +9,8 @@ import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
 import { requestId } from 'hono/request-id'
 import { ZodError } from 'zod'
+import { eventsHandler, subscriptionsHandler, usersHandler } from './handlers'
 import { pinoLogger } from './middlewares/logger'
-import { routes } from './routes'
 
 dayjs.locale('zh-cn')
 dayjs.extend(relativeTime)
@@ -32,10 +32,14 @@ app.onError((err, c) => {
     return c.json(e ? e : { message: err.message }, 400)
   }
 
-  c.var.logger.error('🚀 ~ app.onError:', err)
+  c.var.logger.error(err)
   return c.json({ message: 'Internal Server Error' }, 500)
 })
 
-app.route('/', routes)
+app.get('/', c => c.json({ status: 'ok', message: 'Signal API is running' }))
+
+app.route('/api/events', eventsHandler)
+app.route('/api/subscriptions', subscriptionsHandler)
+app.route('/api', usersHandler)
 
 export default app

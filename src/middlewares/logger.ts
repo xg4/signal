@@ -27,8 +27,6 @@ export const pinoLogger: MiddlewareHandler = async (c, next) => {
 
   const child = logger.child({
     requestId,
-    method,
-    path,
   })
   c.set('logger', child)
   const start = Date.now()
@@ -38,8 +36,5 @@ export const pinoLogger: MiddlewareHandler = async (c, next) => {
   const { status } = c.res
   const elapsed = ms(end - start)
 
-  child.info({
-    status,
-    elapsed,
-  })
+  child.info([method, path, status, elapsed].join(' '))
 }
