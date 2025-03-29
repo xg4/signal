@@ -1,120 +1,288 @@
 import dayjs from 'dayjs'
-import { and, eq } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gte, isNull, like, lte } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
+import { difference, differenceBy } from 'lodash-es'
 import { z } from 'zod'
-import { scheduleService } from '.'
+import { recurrenceService, remindersService } from '.'
 import { db } from '../db'
-import { events } from '../db/schema'
+import { events, reminders } from '../db/schema'
+import { eventBatchInsetSchema, eventInsetSchema } from '../types'
+import { isSameDate } from '../utils/time'
 
-export const createEventSchema = z.object({
-  name: z.string({
-    message: '无效的活动名称',
+export const sortOrder = z.enum(['ascend', 'descend'])
+
+export const eventQuerySchema = z.object({
+  params: z.object({
+    startTime: z.coerce.date().array().optional(),
+    pageSize: z.coerce.number().default(20),
+    current: z.coerce.number().default(1),
+    name: z.string().optional(),
   }),
-  description: z.string().optional().nullable(),
-  dayOfWeek: z.number().min(0).max(6),
-  startTime: z.string({
-    message: '无效的开始时间',
-  }),
-  durationMinutes: z.number().optional(),
-  notifyMinutes: z.array(z.number()).optional(),
-  locations: z.array(z.string()).optional(),
+  sort: z
+    .object({
+      startTime: sortOrder,
+    })
+    .partial()
+    .optional(),
 })
 
-export function setDayOfWeek(dayOfWeek: number) {
-  const now = dayjs()
-  const currentDayOfWeek = now.day()
-  const diff = (dayOfWeek || 7) - (currentDayOfWeek || 7)
-  return now.add(diff, 'day')
+/**
+ * 获取指定时间范围内的所有事件
+ */
+export async function query({ params, sort }: z.infer<typeof eventQuerySchema>) {
+  const conditions = []
+  if (params.startTime) {
+    const [start, end] = params.startTime
+    if (start) {
+      conditions.push(gte(events.startTime, start))
+    }
+    if (end) {
+      conditions.push(lte(events.startTime, end))
+    }
+  }
+  if (params.name) {
+    conditions.push(like(events.name, `%${params.name}%`))
+  }
+
+  conditions.push(isNull(events.deletedAt))
+
+  const limit = params.pageSize
+  const offset = (params.current - 1) * params.pageSize
+
+  let orderBy = []
+  if (sort) {
+    if (sort.startTime) {
+      if (sort.startTime === 'ascend') {
+        orderBy.push(asc(events.startTime))
+      } else {
+        orderBy.push(desc(events.startTime))
+      }
+    }
+  }
+  orderBy.push(desc(events.updatedAt))
+
+  const [[{ total }], data] = await Promise.all([
+    db
+      .select({
+        total: count(),
+      })
+      .from(events)
+      .where(and(...conditions)),
+    db.query.events.findMany({
+      where: and(...conditions),
+      with: {
+        reminders: {
+          where: (r, { isNull }) => isNull(r.deletedAt),
+          orderBy: (r, { asc }) => asc(r.scheduledAt),
+        },
+        recurrenceRules: true,
+      },
+      limit,
+      offset,
+      orderBy,
+    }),
+  ])
+
+  return {
+    data,
+    total,
+  }
 }
 
-export function getEventDate(event: { dayOfWeek: number; startTime: string }) {
-  const day = setDayOfWeek(event.dayOfWeek)
-  return dayjs.tz(`${day.format('YYYY-MM-DD')} ${event.startTime}`, 'Asia/Shanghai')
-}
-
-export async function getEvents() {
-  return db.select().from(events).orderBy(events.id)
-}
-
+/**
+ * 根据ID获取事件
+ */
 export async function getEventById(id: number) {
-  const [event] = await db.select().from(events).where(eq(events.id, id)).limit(1)
+  const event = await db.query.events.findFirst({
+    where: and(eq(events.id, id), isNull(events.deletedAt)),
+    with: {
+      reminders: {
+        where: isNull(reminders.deletedAt),
+      },
+      recurrenceRules: true,
+    },
+  })
+
+  if (!event) {
+    throw new HTTPException(404, { message: '活动不存在或已删除' })
+  }
+
   return event
 }
 
-export async function createEvent(eventData: z.infer<typeof createEventSchema>) {
-  const [currentEvent] = await db
-    .select()
-    .from(events)
-    .where(
-      and(
-        eq(events.name, eventData.name),
-        eq(events.dayOfWeek, eventData.dayOfWeek),
-        eq(events.startTime, eventData.startTime),
-      ),
-    )
-    .limit(1)
-  if (currentEvent) {
+/**
+ * 创建新事件
+ */
+export async function add(eventData: z.infer<typeof eventInsetSchema>) {
+  const existingEvent = await db.query.events.findFirst({
+    where: and(eq(events.startTime, eventData.startTime), eq(events.name, eventData.name), isNull(events.deletedAt)),
+  })
+
+  if (existingEvent) {
     throw new HTTPException(400, { message: '活动已存在' })
   }
-  const [newEvent] = await db.insert(events).values(eventData).returning()
-  if (newEvent) {
-    scheduleService.updateSchedule(newEvent)
+
+  // 提取 recurrenceType 和相关字段
+  const { recurrenceType, recurrenceInterval, recurrenceEndDate, reminderTimes, ...eventValues } = eventData
+
+  // 创建事件
+  const [newEvent] = await db.insert(events).values(eventValues).returning()
+
+  const [newRule, newReminders] = await Promise.all([
+    recurrenceType
+      ? recurrenceService.create(newEvent, {
+          recurrenceType,
+          recurrenceInterval,
+          recurrenceEndDate,
+        })
+      : null,
+    reminderTimes?.length ? remindersService.create(newEvent, reminderTimes) : null,
+  ])
+
+  return {
+    ...newEvent,
+    recurrenceRules: newRule,
+    reminders: newReminders,
   }
-  return newEvent
 }
 
-export async function updateEvent(id: number, eventData: z.infer<typeof createEventSchema>) {
-  const [existingEvent] = await db.select().from(events).where(eq(events.id, id)).limit(1)
+/**
+ * 更新事件
+ */
+export async function update(id: number, updateData: z.infer<typeof eventInsetSchema>) {
+  const existingEvent = await db.query.events.findFirst({
+    where: and(eq(events.id, id), isNull(events.deletedAt)),
+    with: {
+      reminders: {
+        where: isNull(reminders.deletedAt),
+      },
+      recurrenceRules: true,
+    },
+  })
 
   if (!existingEvent) {
     throw new HTTPException(404, { message: '活动不存在或已删除' })
   }
 
-  const [updatedEvent] = await db.update(events).set(eventData).where(eq(events.id, id)).returning()
+  // 提取 reminderTimes 和相关字段
+  const { reminderTimes, recurrenceType, recurrenceInterval, recurrenceEndDate, ...eventValues } = updateData
 
-  if (updatedEvent) {
-    scheduleService.updateSchedule(updatedEvent)
+  // 更新事件
+  const [newEvent] = await db.update(events).set(eventValues).where(eq(events.id, id)).returning()
+
+  const updateRule = async () => {
+    if (!recurrenceType) {
+      await recurrenceService.remove(newEvent.id)
+      return null
+    }
+
+    if (!existingEvent.recurrenceRules) {
+      return recurrenceService.create(newEvent, {
+        recurrenceType,
+        recurrenceInterval,
+        recurrenceEndDate,
+      })
+    }
+
+    if (
+      existingEvent.recurrenceRules &&
+      existingEvent.durationMinutes === newEvent.durationMinutes &&
+      dayjs(existingEvent.startTime).isSame(newEvent.startTime, 'minutes') &&
+      recurrenceType === existingEvent.recurrenceRules.recurrenceType &&
+      recurrenceInterval === existingEvent.recurrenceRules.recurrenceInterval &&
+      isSameDate(recurrenceEndDate, existingEvent.recurrenceRules.recurrenceEndDate)
+    ) {
+      return existingEvent.recurrenceRules
+    }
+
+    await recurrenceService.remove(newEvent.id)
+    return recurrenceService.create(newEvent, {
+      recurrenceType,
+      recurrenceInterval,
+      recurrenceEndDate,
+    })
   }
-  return updatedEvent
+
+  const updateReminder = async () => {
+    if (!reminderTimes) {
+      await remindersService.remove(existingEvent.id)
+      return null
+    }
+
+    if (!existingEvent.reminders.length) {
+      return remindersService.create(newEvent, reminderTimes)
+    }
+
+    if (!dayjs(existingEvent.startTime).isSame(newEvent.startTime, 'minutes')) {
+      await remindersService.remove(existingEvent.id)
+      return remindersService.create(newEvent, reminderTimes)
+    }
+
+    const existingMinutes = existingEvent.reminders.map(i => i.minutesBefore)
+    const deleteItems = difference(existingMinutes, reminderTimes)
+    const addItems = difference(reminderTimes, existingMinutes)
+    const [deleted, added] = await Promise.all([
+      deleteItems.length ? remindersService.remove(existingEvent.id, deleteItems) : [],
+      addItems.length ? remindersService.create(newEvent, addItems) : [],
+    ])
+
+    return [...differenceBy(existingEvent.reminders, deleted, 'id'), ...added]
+  }
+
+  const [newRule, newReminders] = await Promise.all([updateRule(), updateReminder()])
+
+  return {
+    ...newEvent,
+    recurrenceRules: newRule,
+    reminders: newReminders,
+  }
 }
 
-export async function deleteEvent(id: number) {
-  const [existingEvent] = await db.select().from(events).where(eq(events.id, id)).limit(1)
+/**
+ * 删除事件
+ */
+export async function remove(id: number) {
+  const existingEvent = await db.query.events.findFirst({
+    where: and(eq(events.id, id), isNull(events.deletedAt)),
+    with: {
+      reminders: {
+        where: isNull(reminders.deletedAt),
+      },
+    },
+  })
 
   if (!existingEvent) {
     throw new HTTPException(404, { message: '活动不存在或已删除' })
   }
 
-  await db.delete(events).where(eq(events.id, id))
+  // 逻辑删除事件，设置 deletedAt 字段为当前时间
+  await db.update(events).set({ deletedAt: new Date() }).where(eq(events.id, existingEvent.id))
 
-  scheduleService.deleteCronJob(id)
+  await Promise.all([recurrenceService.remove(existingEvent.id), remindersService.remove(existingEvent.id)])
 }
 
-export async function importEvents(jsonData: z.infer<typeof createEventSchema>[]) {
-  const tasks = await Promise.allSettled(
-    jsonData.map(async e => {
-      const [currentEvent] = await db
-        .select()
-        .from(events)
-        .where(and(eq(events.name, e.name), eq(events.dayOfWeek, e.dayOfWeek), eq(events.startTime, e.startTime)))
-        .limit(1)
+/**
+ * 批量创建事件
+ */
+export async function batch(eventsArray: z.infer<typeof eventBatchInsetSchema>) {
+  const results = await Promise.allSettled(eventsArray.map(add))
+  return results.filter(i => i.status === 'fulfilled').flatMap(i => i.value)
+}
 
-      if (!currentEvent) {
-        return createEvent(e)
-      }
-      return updateEvent(currentEvent.id, e)
-    }),
-  )
+export async function updateByRecurrence(eventId: number, nextTime: Date) {
+  const [newEvent] = await db
+    .update(events)
+    .set({
+      startTime: nextTime,
+    })
+    .where(eq(events.id, eventId))
+    .returning()
 
-  const errors = tasks.filter(t => t.status === 'rejected').map(i => i.reason)
-  if (errors.length) {
-    console.log('🚀 ~ importEvents ~ error:', ...errors)
+  const existingReminders = await remindersService.getByEventId(newEvent.id)
+  if (!existingReminders.length) {
+    return
   }
-
-  console.log(
-    '🚀 ~ importEvents ~ all:',
-    jsonData.length,
-    'success:',
-    tasks.filter(t => t.status === 'fulfilled').length,
-  )
+  await remindersService.remove(newEvent.id)
+  const reminderTimes = existingReminders.map(i => i.minutesBefore)
+  await remindersService.create(newEvent, reminderTimes)
 }

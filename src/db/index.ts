@@ -1,6 +1,7 @@
-import { Database } from 'bun:sqlite'
-import { drizzle } from 'drizzle-orm/bun-sqlite'
-import { ProcessEnv } from '../env'
+import { drizzle } from 'drizzle-orm/bun-sql'
+import { Env } from '../config/env'
+import * as schema from './schema'
 
-const client = new Database(ProcessEnv.DATABASE_URL)
-export const db = drizzle({ client })
+export const db = drizzle(Env.DATABASE_URL, {
+  schema,
+})

@@ -7,9 +7,10 @@ import utc from 'dayjs/plugin/utc'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
+import { requestId } from 'hono/request-id'
 import { ZodError } from 'zod'
-import { logger } from './middlewares/logger'
-import { routes } from './routes'
+import { pinoLogger } from './middlewares/logger'
+import { eventRoutes, subscriptionRoutes, userRoutes } from './routes'
 
 dayjs.locale('zh-cn')
 dayjs.extend(relativeTime)
@@ -17,7 +18,7 @@ dayjs.extend(utc)
 dayjs.extend(timezone)
 dayjs.extend(duration)
 
-const app = new Hono().use(cors()).use(logger)
+const app = new Hono().use(cors()).use(requestId()).use(pinoLogger)
 
 app.onError((err, c) => {
   if (err instanceof HTTPException) {
@@ -31,10 +32,14 @@ app.onError((err, c) => {
     return c.json(e ? e : { message: err.message }, 400)
   }
 
-  console.error('🚀 ~ app.onError ~ onError:', err)
+  c.var.logger.error(err)
   return c.json({ message: 'Internal Server Error' }, 500)
 })
 
-app.route('/', routes)
+app.get('/', c => c.json({ status: 'ok', message: 'Signal API is running' }))
+
+app.route('/api/events', eventRoutes)
+app.route('/api/subscriptions', subscriptionRoutes)
+app.route('/api', userRoutes)
 
 export default app

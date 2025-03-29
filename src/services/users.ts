@@ -1,15 +1,21 @@
-import dayjs from 'dayjs'
 import { eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
-import { sign } from 'hono/jwt'
 import { z } from 'zod'
 import { db } from '../db'
 import { users } from '../db/schema'
-import { ProcessEnv } from '../env'
 import { comparePassword, hashPassword } from '../utils/crypto'
+import { generateToken } from '../utils/jwt'
+
+const usernameSchema = z
+  .string()
+  .min(3, { message: '用户名至少需要 3 个字符' })
+  .max(15, { message: '用户名最多 15 个字符' })
+  .regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, {
+    message: '用户名只能包含字母、数字、下划线_和连字符-，且必须以字母开头',
+  })
 
 export const loginSchema = z.object({
-  username: z.string(),
+  username: usernameSchema,
   password: z.string(),
 })
 
@@ -18,29 +24,18 @@ export type LoginData = z.infer<typeof loginSchema>
 export async function login(data: LoginData) {
   const { username, password } = data
 
-  // 查询用户
   const [user] = await db.select().from(users).where(eq(users.username, username))
 
   if (!user) {
     throw new HTTPException(400, { message: '用户名或密码错误' })
   }
 
-  // 验证密码
-  const isValidPassword = await comparePassword(password, user.password)
-  if (!isValidPassword) {
+  const isPasswordValid = await comparePassword(password, user.password)
+  if (!isPasswordValid) {
     throw new HTTPException(400, { message: '用户名或密码错误' })
   }
 
-  // 签发 JWT token
-  const token = await sign(
-    {
-      userId: user.id,
-      username: user.username,
-      exp: dayjs().add(1, 'month').unix(),
-      iat: dayjs().unix(),
-    },
-    ProcessEnv.JWT_SECRET,
-  )
+  const token = await generateToken(user)
 
   return {
     token,
@@ -50,10 +45,9 @@ export async function login(data: LoginData) {
 export async function createUser(data: LoginData) {
   const { username, password } = data
 
-  // 查询用户
-  const [user] = await db.select().from(users).where(eq(users.username, username))
+  const [existingUser] = await db.select().from(users).where(eq(users.username, username))
 
-  if (user) {
+  if (existingUser) {
     throw new HTTPException(400, { message: '用户名已存在' })
   }
 
@@ -67,20 +61,7 @@ export async function createUser(data: LoginData) {
     })
     .returning()
 
-  if (!newUser) {
-    throw new HTTPException()
-  }
-
-  // 签发 JWT token
-  const token = await sign(
-    {
-      userId: newUser.id,
-      username: newUser.username,
-      exp: dayjs().add(1, 'month').unix(),
-      iat: dayjs().unix(),
-    },
-    ProcessEnv.JWT_SECRET,
-  )
+  const token = await generateToken(newUser)
 
   return {
     token,
@@ -94,7 +75,7 @@ export async function getUserById(id: number) {
       username: users.username,
       nickname: users.nickname,
       createdAt: users.createdAt,
-      isAdmin: users.isAdmin,
+      role: users.role,
     })
     .from(users)
     .where(eq(users.id, id))

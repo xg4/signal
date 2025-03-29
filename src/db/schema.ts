@@ -1,56 +1,103 @@
-import { integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core'
+import { relations } from 'drizzle-orm'
+import { boolean, customType, index, integer, pgEnum, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core'
 
-// 活动表
-export const events = sqliteTable(
-  'events',
-  {
-    id: integer('id').primaryKey(),
-    name: text('name').notNull(),
-    description: text('description'),
-    dayOfWeek: integer('day_of_week').notNull(), // 0-6 表示周日到周六
-    startTime: text('start_time').notNull(),
-    durationMinutes: integer('duration_minutes').default(0),
-    notifyMinutes: text('notify_minutes', { mode: 'json' }).$type<number[]>().notNull().default([]),
-    locations: text('locations', { mode: 'json' }).$type<string[]>().notNull().default([]),
-    createdAt: integer('created_at', { mode: 'timestamp' })
-      .notNull()
-      .$default(() => new Date()),
-    updatedAt: integer('updated_at', { mode: 'timestamp' })
-      .notNull()
-      .$default(() => new Date())
-      .$onUpdate(() => new Date()),
-  },
-  t => [unique().on(t.name, t.dayOfWeek, t.startTime)],
-)
-
-// 订阅表
-export const subscriptions = sqliteTable('subscriptions', {
-  id: integer('id').primaryKey(),
-  endpoint: text('endpoint').notNull(),
-  auth: text('auth').notNull(),
-  p256dh: text('p256dh').notNull(),
-  deviceCode: text('device_code').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' })
+const timestamps = {
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at')
+    .defaultNow()
     .notNull()
-    .$default(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' })
-    .notNull()
-    .$default(() => new Date())
     .$onUpdate(() => new Date()),
+  deletedAt: timestamp('deleted_at'),
+}
+
+export const userRoleEnum = pgEnum('user_role', ['guest', 'user', 'admin'])
+
+const citext = customType<{ data: string }>({
+  dataType() {
+    return 'citext'
+  },
 })
 
-// 用户表
-export const users = sqliteTable('users', {
-  id: integer('id').primaryKey(),
-  username: text('username').notNull().unique(),
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  username: citext().notNull().unique(),
   password: text('password').notNull(),
   nickname: text('nickname'),
-  isAdmin: integer('is_admin', { mode: 'boolean' }).notNull().default(false),
-  createdAt: integer('created_at', { mode: 'timestamp' })
-    .notNull()
-    .$default(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' })
-    .notNull()
-    .$default(() => new Date())
-    .$onUpdate(() => new Date()),
+  role: userRoleEnum('role').default('user').notNull(),
+  ...timestamps,
 })
+
+export const events = pgTable(
+  'events',
+  {
+    id: serial('id').primaryKey(),
+    name: text('name').notNull(),
+    description: text('description'),
+    locations: text('locations').array(),
+    startTime: timestamp('start_time').notNull(),
+    durationMinutes: integer('duration_minutes').default(0).notNull(),
+    ...timestamps,
+  },
+  t => [index().on(t.startTime, t.name)],
+)
+
+export const subscriptions = pgTable(
+  'subscriptions',
+  {
+    id: serial('id').primaryKey(),
+    endpoint: text('endpoint').notNull(),
+    p256dh: text('p256dh').notNull(),
+    auth: text('auth').notNull(),
+    userAgent: text('user_agent'),
+    deviceCode: text('device_code').notNull(),
+    ...timestamps,
+  },
+  t => [index().on(t.deviceCode)],
+)
+
+export const reminders = pgTable(
+  'reminders',
+  {
+    id: serial('id').primaryKey(),
+    eventId: integer('event_id')
+      .references(() => events.id)
+      .notNull(),
+    minutesBefore: integer('minutes_before').notNull(),
+    sent: boolean('sent').default(false).notNull(),
+    scheduledAt: timestamp('scheduled_at').notNull(),
+    ...timestamps,
+  },
+  t => [index().on(t.sent, t.scheduledAt), index().on(t.eventId)],
+)
+
+export const recurrenceTypeEnum = pgEnum('recurrence_type', ['daily', 'weekly', 'monthly'])
+
+export const recurrenceRules = pgTable('recurrence_rules', {
+  id: serial('id').primaryKey(),
+  eventId: integer('event_id')
+    .references(() => events.id)
+    .notNull(),
+  recurrenceType: recurrenceTypeEnum('recurrence_type').notNull(),
+  recurrenceInterval: integer('recurrence_interval').default(1).notNull(),
+  recurrenceEndDate: timestamp('recurrence_end_date'),
+  ...timestamps,
+})
+
+export const eventsRelations = relations(events, ({ many, one }) => ({
+  reminders: many(reminders),
+  recurrenceRules: one(recurrenceRules),
+}))
+
+export const remindersRelations = relations(reminders, ({ one }) => ({
+  event: one(events, {
+    fields: [reminders.eventId],
+    references: [events.id],
+  }),
+}))
+
+export const recurrenceRulesRelations = relations(recurrenceRules, ({ one }) => ({
+  event: one(events, {
+    fields: [recurrenceRules.eventId],
+    references: [events.id],
+  }),
+}))
