@@ -13,19 +13,21 @@ WORKDIR /app
 COPY --from=deps /temp/dev/node_modules ./node_modules
 COPY . .
 
-ENV NODE_ENV=production
-RUN bun run build
+# ENV NODE_ENV=production
+# RUN bun run build
 
 FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/drizzle ./drizzle
-COPY --from=builder /app/dist ./
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/package.json ./package.json
 
 EXPOSE 3789/tcp
 
 ENV PORT=3789
 
-ENTRYPOINT ["bun", "run", "index.js"]
+ENTRYPOINT ["bun"]
