@@ -1,7 +1,7 @@
+import type { User } from '@prisma/client'
 import dayjs from 'dayjs'
 import { sign } from 'hono/jwt'
 import { Env } from '../config/env'
-import type { User } from '../types'
 
 export function generateToken(user: User): Promise<string> {
   return sign(

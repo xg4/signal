@@ -11,6 +11,7 @@ LICENSE
 Makefile
 helm-charts
 .env
+.env*
 .editorconfig
 prettier.config.mjs
 coverage*

@@ -19,30 +19,35 @@ const subscriptionSchema = z.object({
   }),
 })
 
-const subscriptionInsetSchema = z.object({
-  subscription: subscriptionSchema,
-})
+subscriptionRoutes.post(
+  '/',
+  zValidator(
+    'json',
+    z.object({
+      subscription: subscriptionSchema,
+    }),
+  ),
+  async c => {
+    const { subscription } = c.req.valid('json')
 
-subscriptionRoutes.post('/', zValidator('json', subscriptionInsetSchema), async c => {
-  const { subscription } = c.req.valid('json')
+    const userAgent = c.req.header('user-agent')
+    const deviceCode = await subscriptionsService.generateSubscriptionKey({
+      endpoint: subscription.endpoint,
+      p256dh: subscription.keys.p256dh,
+      auth: subscription.keys.auth,
+    })
 
-  const userAgent = c.req.header('user-agent')
-  const deviceCode = await subscriptionsService.generateSubscriptionKey({
-    endpoint: subscription.endpoint,
-    p256dh: subscription.keys.p256dh,
-    auth: subscription.keys.auth,
-  })
+    const newSubscription = await subscriptionsService.saveSubscription({
+      deviceCode,
+      endpoint: subscription.endpoint,
+      p256dh: subscription.keys.p256dh,
+      auth: subscription.keys.auth,
+      userAgent,
+    })
 
-  const newSubscription = await subscriptionsService.saveSubscription({
-    deviceCode,
-    endpoint: subscription.endpoint,
-    p256dh: subscription.keys.p256dh,
-    auth: subscription.keys.auth,
-    userAgent,
-  })
-
-  return c.json(newSubscription, 201)
-})
+    return c.json(newSubscription, 201)
+  },
+)
 
 const deviceCodeSchema = z.object({
   code: z

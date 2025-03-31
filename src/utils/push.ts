@@ -1,7 +1,7 @@
+import type { Subscription } from '@prisma/client'
 import webPush from 'web-push'
 import { z } from 'zod'
 import { Env } from '../config/env'
-import type { Subscription } from '../types'
 import { logger } from './log'
 
 // Initialize web push with VAPID keys

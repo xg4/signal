@@ -1,3 +1,4 @@
+import { UserRole } from '@prisma/client'
 import type { MiddlewareHandler } from 'hono'
 import { every } from 'hono/combine'
 import { HTTPException } from 'hono/http-exception'
@@ -10,7 +11,7 @@ export const userRequired = jwt({
 
 export const adminRequired: MiddlewareHandler = every(userRequired, async (c, next) => {
   const { userRole } = c.get('jwtPayload')
-  if (userRole !== 'admin') {
+  if (userRole !== UserRole.ADMIN) {
     throw new HTTPException(403, { message: '无权限访问' })
   }
   await next()

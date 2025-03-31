@@ -1,13 +1,11 @@
+import type { Event } from '@prisma/client'
 import dayjs from 'dayjs'
-import { and, asc, count, desc, eq, gte, isNull, like, lte } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
-import { difference, differenceBy } from 'lodash-es'
+import { difference, pick } from 'lodash-es'
 import { z } from 'zod'
 import { recurrenceService, remindersService } from '.'
-import { db } from '../db'
-import { events, reminders } from '../db/schema'
-import { eventBatchInsetSchema, eventInsetSchema } from '../types'
-import { isSameDate } from '../utils/time'
+import { dateLikeToDate } from '../types'
+import { prisma } from '../utils/prisma'
 
 export const sortOrder = z.enum(['ascend', 'descend'])
 
@@ -30,56 +28,49 @@ export const eventQuerySchema = z.object({
  * 获取指定时间范围内的所有事件
  */
 export async function query({ params, sort }: z.infer<typeof eventQuerySchema>) {
-  const conditions = []
+  const conditions: any = {}
   if (params.startTime) {
     const [start, end] = params.startTime
     if (start) {
-      conditions.push(gte(events.startTime, start))
+      conditions.startTime.gte = start
     }
     if (end) {
-      conditions.push(lte(events.startTime, end))
+      conditions.startTime.lte = end
     }
   }
   if (params.name) {
-    conditions.push(like(events.name, `%${params.name}%`))
+    conditions.name.contains = params.name
   }
 
-  conditions.push(isNull(events.deletedAt))
+  conditions.deletedAt = null
 
-  const limit = params.pageSize
-  const offset = (params.current - 1) * params.pageSize
+  const take = params.pageSize
+  const skip = (params.current - 1) * params.pageSize
 
-  let orderBy = []
+  const orderBy: any = {}
   if (sort) {
     if (sort.startTime) {
       if (sort.startTime === 'ascend') {
-        orderBy.push(asc(events.startTime))
+        orderBy.startTime = 'asc'
       } else {
-        orderBy.push(desc(events.startTime))
+        orderBy.startTime = 'desc'
       }
     }
   }
-  orderBy.push(desc(events.updatedAt))
+  orderBy.updatedAt = 'desc'
 
-  const [[{ total }], data] = await Promise.all([
-    db
-      .select({
-        total: count(),
-      })
-      .from(events)
-      .where(and(...conditions)),
-    db.query.events.findMany({
-      where: and(...conditions),
-      with: {
-        reminders: {
-          where: (r, { isNull }) => isNull(r.deletedAt),
-          orderBy: (r, { asc }) => asc(r.scheduledAt),
-        },
-        recurrenceRules: true,
-      },
-      limit,
-      offset,
+  const [total, data] = await Promise.all([
+    prisma.event.count({
+      where: conditions,
+    }),
+    prisma.event.findMany({
+      where: conditions,
       orderBy,
+      skip,
+      take,
+      include: {
+        recurrenceRule: true,
+      },
     }),
   ])
 
@@ -93,13 +84,13 @@ export async function query({ params, sort }: z.infer<typeof eventQuerySchema>) 
  * 根据ID获取事件
  */
 export async function getEventById(id: number) {
-  const event = await db.query.events.findFirst({
-    where: and(eq(events.id, id), isNull(events.deletedAt)),
-    with: {
-      reminders: {
-        where: isNull(reminders.deletedAt),
-      },
-      recurrenceRules: true,
+  const event = await prisma.event.findUnique({
+    where: {
+      id,
+      deletedAt: null,
+    },
+    include: {
+      recurrenceRule: true,
     },
   })
 
@@ -110,53 +101,67 @@ export async function getEventById(id: number) {
   return event
 }
 
+export const eventInsetSchema = z
+  .object({
+    name: z.string(),
+    description: z.string().optional(),
+    startTime: dateLikeToDate,
+    locations: z.string().array().optional(),
+    durationMinutes: z.number().int().optional(),
+    reminderTimes: z.number().int().array().optional(),
+  })
+  .merge(recurrenceService.recurrenceRuleInsetSchema)
+
 /**
  * 创建新事件
  */
-export async function add(eventData: z.infer<typeof eventInsetSchema>) {
-  const existingEvent = await db.query.events.findFirst({
-    where: and(eq(events.startTime, eventData.startTime), eq(events.name, eventData.name), isNull(events.deletedAt)),
+export async function create(eventData: z.infer<typeof eventInsetSchema>) {
+  const existingEvent = await prisma.event.findFirst({
+    where: {
+      ...pick(eventData, ['startTime', 'name']),
+      deletedAt: null,
+    },
   })
 
   if (existingEvent) {
     throw new HTTPException(400, { message: '活动已存在' })
   }
 
-  // 提取 recurrenceType 和相关字段
-  const { recurrenceType, recurrenceInterval, recurrenceEndDate, reminderTimes, ...eventValues } = eventData
+  const { recurrenceType, recurrenceInterval, recurrenceEndDate, ...values } = eventData
 
-  // 创建事件
-  const [newEvent] = await db.insert(events).values(eventValues).returning()
+  const newEvent = await prisma.event.create({
+    data: values,
+  })
 
-  const [newRule, newReminders] = await Promise.all([
+  await Promise.all([
     recurrenceType
       ? recurrenceService.create(newEvent, {
-          recurrenceType,
-          recurrenceInterval,
           recurrenceEndDate,
+          recurrenceInterval,
+          recurrenceType,
         })
       : null,
-    reminderTimes?.length ? remindersService.create(newEvent, reminderTimes) : null,
+    remindersService.enqueue(newEvent),
   ])
 
-  return {
-    ...newEvent,
-    recurrenceRules: newRule,
-    reminders: newReminders,
-  }
+  return prisma.event.findUnique({
+    where: {
+      id: newEvent.id,
+    },
+  })
 }
 
 /**
  * 更新事件
  */
 export async function update(id: number, updateData: z.infer<typeof eventInsetSchema>) {
-  const existingEvent = await db.query.events.findFirst({
-    where: and(eq(events.id, id), isNull(events.deletedAt)),
-    with: {
-      reminders: {
-        where: isNull(reminders.deletedAt),
-      },
-      recurrenceRules: true,
+  const existingEvent = await prisma.event.findUnique({
+    where: {
+      id,
+      deletedAt: null,
+    },
+    include: {
+      recurrenceRule: true,
     },
   })
 
@@ -164,19 +169,24 @@ export async function update(id: number, updateData: z.infer<typeof eventInsetSc
     throw new HTTPException(404, { message: '活动不存在或已删除' })
   }
 
-  // 提取 reminderTimes 和相关字段
-  const { reminderTimes, recurrenceType, recurrenceInterval, recurrenceEndDate, ...eventValues } = updateData
+  const { recurrenceType, recurrenceInterval, recurrenceEndDate, ...values } = updateData
 
-  // 更新事件
-  const [newEvent] = await db.update(events).set(eventValues).where(eq(events.id, id)).returning()
+  const newEvent = await prisma.event.update({
+    data: values,
+    where: {
+      id,
+    },
+  })
 
   const updateRule = async () => {
     if (!recurrenceType) {
-      await recurrenceService.remove(newEvent.id)
-      return null
+      if (newEvent.recurrenceId) {
+        await recurrenceService.remove(newEvent.recurrenceId)
+      }
+      return
     }
 
-    if (!existingEvent.recurrenceRules) {
+    if (!newEvent.recurrenceId) {
       return recurrenceService.create(newEvent, {
         recurrenceType,
         recurrenceInterval,
@@ -184,19 +194,7 @@ export async function update(id: number, updateData: z.infer<typeof eventInsetSc
       })
     }
 
-    if (
-      existingEvent.recurrenceRules &&
-      existingEvent.durationMinutes === newEvent.durationMinutes &&
-      dayjs(existingEvent.startTime).isSame(newEvent.startTime, 'minutes') &&
-      recurrenceType === existingEvent.recurrenceRules.recurrenceType &&
-      recurrenceInterval === existingEvent.recurrenceRules.recurrenceInterval &&
-      isSameDate(recurrenceEndDate, existingEvent.recurrenceRules.recurrenceEndDate)
-    ) {
-      return existingEvent.recurrenceRules
-    }
-
-    await recurrenceService.remove(newEvent.id)
-    return recurrenceService.create(newEvent, {
+    return recurrenceService.update(newEvent, {
       recurrenceType,
       recurrenceInterval,
       recurrenceEndDate,
@@ -204,50 +202,47 @@ export async function update(id: number, updateData: z.infer<typeof eventInsetSc
   }
 
   const updateReminder = async () => {
-    if (!reminderTimes) {
-      await remindersService.remove(existingEvent.id)
-      return null
+    if (!values.reminderTimes?.length) {
+      await remindersService.dequeue(existingEvent.id, existingEvent.reminderTimes)
+      return
     }
 
-    if (!existingEvent.reminders.length) {
-      return remindersService.create(newEvent, reminderTimes)
+    if (!existingEvent.reminderTimes.length) {
+      await remindersService.enqueue(newEvent)
+      return
     }
 
     if (!dayjs(existingEvent.startTime).isSame(newEvent.startTime, 'minutes')) {
-      await remindersService.remove(existingEvent.id)
-      return remindersService.create(newEvent, reminderTimes)
+      await remindersService.dequeue(existingEvent.id, existingEvent.reminderTimes)
+      return remindersService.enqueue(newEvent)
     }
 
-    const existingMinutes = existingEvent.reminders.map(i => i.minutesBefore)
-    const deleteItems = difference(existingMinutes, reminderTimes)
-    const addItems = difference(reminderTimes, existingMinutes)
-    const [deleted, added] = await Promise.all([
-      deleteItems.length ? remindersService.remove(existingEvent.id, deleteItems) : [],
-      addItems.length ? remindersService.create(newEvent, addItems) : [],
+    const existingMinutes = existingEvent.reminderTimes
+    const deleteItems = difference(existingMinutes, values.reminderTimes)
+    const addItems = difference(values.reminderTimes, existingMinutes)
+    await Promise.all([
+      deleteItems.length ? remindersService.dequeue(existingEvent.id, deleteItems) : null,
+      addItems.length ? remindersService.enqueue(newEvent, addItems) : null,
     ])
-
-    return [...differenceBy(existingEvent.reminders, deleted, 'id'), ...added]
   }
 
-  const [newRule, newReminders] = await Promise.all([updateRule(), updateReminder()])
+  await Promise.all([updateRule(), updateReminder()])
 
-  return {
-    ...newEvent,
-    recurrenceRules: newRule,
-    reminders: newReminders,
-  }
+  return prisma.event.findUnique({
+    where: {
+      id,
+    },
+  })
 }
 
 /**
  * 删除事件
  */
 export async function remove(id: number) {
-  const existingEvent = await db.query.events.findFirst({
-    where: and(eq(events.id, id), isNull(events.deletedAt)),
-    with: {
-      reminders: {
-        where: isNull(reminders.deletedAt),
-      },
+  const existingEvent = await prisma.event.findUnique({
+    where: {
+      id,
+      deletedAt: null,
     },
   })
 
@@ -255,34 +250,40 @@ export async function remove(id: number) {
     throw new HTTPException(404, { message: '活动不存在或已删除' })
   }
 
-  // 逻辑删除事件，设置 deletedAt 字段为当前时间
-  await db.update(events).set({ deletedAt: new Date() }).where(eq(events.id, existingEvent.id))
+  await prisma.event.update({
+    data: {
+      deletedAt: new Date(),
+    },
+    where: {
+      id,
+    },
+  })
 
-  await Promise.all([recurrenceService.remove(existingEvent.id), remindersService.remove(existingEvent.id)])
+  await Promise.all([
+    recurrenceService.remove(existingEvent.id),
+    remindersService.dequeue(existingEvent.id, existingEvent.reminderTimes),
+  ])
 }
+
+export const eventBatchInsetSchema = eventInsetSchema.array().nonempty()
 
 /**
  * 批量创建事件
  */
 export async function batch(eventsArray: z.infer<typeof eventBatchInsetSchema>) {
-  const results = await Promise.allSettled(eventsArray.map(add))
+  const results = await Promise.allSettled(eventsArray.map(create))
   return results.filter(i => i.status === 'fulfilled').flatMap(i => i.value)
 }
 
-export async function updateByRecurrence(eventId: number, nextTime: Date) {
-  const [newEvent] = await db
-    .update(events)
-    .set({
-      startTime: nextTime,
-    })
-    .where(eq(events.id, eventId))
-    .returning()
+export async function copy(event: Event, startTime: Date) {
+  const newEvent = await prisma.event.create({
+    data: {
+      ...event,
+      startTime,
+    },
+  })
 
-  const existingReminders = await remindersService.getByEventId(newEvent.id)
-  if (!existingReminders.length) {
-    return
-  }
-  await remindersService.remove(newEvent.id)
-  const reminderTimes = existingReminders.map(i => i.minutesBefore)
-  await remindersService.create(newEvent, reminderTimes)
+  await remindersService.enqueue(newEvent)
+
+  return newEvent
 }

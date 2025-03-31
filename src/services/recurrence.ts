@@ -1,36 +1,36 @@
+import { RecurrenceType, type Event, type RecurrenceRule } from '@prisma/client'
 import dayjs from 'dayjs'
-import { eq } from 'drizzle-orm'
 import { pick } from 'lodash-es'
 import { z } from 'zod'
-import { db } from '../db'
-import { recurrenceRules } from '../db/schema'
 import { recurrenceQueue } from '../queues/recurrence'
-import { type Event, type RecurrenceRule, recurrenceRulesInsetSchema } from '../types'
+import { dateLikeToDate, recurrenceTypeSchema } from '../types'
+import { prisma } from '../utils/prisma'
 
 // 添加循环活动到队列
-export function enqueue(e: Event, r: RecurrenceRule) {
+export async function enqueue(e: Event, r: RecurrenceRule) {
   let pattern
   const endTime = dayjs(e.startTime).add(e.durationMinutes, 'minutes')
-  if (r.recurrenceType === 'daily') {
+  if (r.type === RecurrenceType.DAILY) {
     pattern = `${endTime.minute()} ${endTime.hour()} * * *`
   }
-  if (r.recurrenceType === 'weekly') {
+  if (r.type === RecurrenceType.WEEKLY) {
     pattern = `${endTime.minute()} ${endTime.hour()} * * ${endTime.day()}`
   }
-  if (r.recurrenceType === 'monthly') {
+  if (r.type === RecurrenceType.MONTHLY) {
     pattern = `${endTime.minute()} ${endTime.hour()} ${endTime.date()} * *`
   }
 
   let endDate
-  if (r.recurrenceEndDate) {
-    endDate = dayjs(r.recurrenceEndDate).toDate()
+  if (r.endDate) {
+    endDate = dayjs(r.endDate).toDate()
     if (dayjs().isAfter(endDate)) {
       return null
     }
   }
+  const jobSchedulerId = [r.id].join('-')
 
   return recurrenceQueue.upsertJobScheduler(
-    [r.eventId, r.id].join('-'),
+    jobSchedulerId,
     {
       pattern,
       endDate,
@@ -38,14 +38,14 @@ export function enqueue(e: Event, r: RecurrenceRule) {
     },
     {
       name: 'cron-job',
-      data: pick(r, ['eventId', 'id']),
+      data: pick(r, ['id']),
       opts: {},
     },
   )
 }
 
-export async function dequeue(r: RecurrenceRule) {
-  return recurrenceQueue.removeJobScheduler([r.eventId, r.id].join('-'))
+export async function dequeue(id: number) {
+  return recurrenceQueue.removeJobScheduler([id].join('-'))
 }
 
 export const jobQuerySchema = z.object({
@@ -79,28 +79,68 @@ export async function getStatus(key: string) {
   return pick(job, ['id', 'name', 'pattern', 'next', 'endDate'])
 }
 
+export const recurrenceRuleInsetSchema = z.object({
+  recurrenceType: recurrenceTypeSchema.optional(),
+  recurrenceInterval: z.coerce.number().default(1),
+  recurrenceEndDate: dateLikeToDate.optional().nullable(),
+})
+
 export async function create(
   e: Event,
-  { recurrenceType, recurrenceEndDate, recurrenceInterval }: z.infer<typeof recurrenceRulesInsetSchema>,
+  { recurrenceType, recurrenceEndDate, recurrenceInterval }: z.infer<typeof recurrenceRuleInsetSchema>,
 ) {
   if (!recurrenceType) {
     return null
   }
-  const [result] = await db
-    .insert(recurrenceRules)
-    .values({
-      eventId: e.id,
-      recurrenceType,
-      recurrenceEndDate,
-      recurrenceInterval,
-    })
-    .returning()
+  const result = await prisma.recurrenceRule.create({
+    data: {
+      type: recurrenceType,
+      endDate: recurrenceEndDate,
+      interval: recurrenceInterval,
+    },
+  })
+
+  await Promise.all([
+    prisma.event.update({
+      where: {
+        id: e.id,
+      },
+      data: {
+        recurrenceId: result.id,
+      },
+    }),
+    enqueue(e, result),
+  ])
+  return result
+}
+
+export async function update(
+  e: Event,
+  { recurrenceType, recurrenceEndDate, recurrenceInterval }: z.infer<typeof recurrenceRuleInsetSchema>,
+) {
+  if (!recurrenceType || !e.recurrenceId) {
+    return null
+  }
+  const result = await prisma.recurrenceRule.update({
+    where: {
+      id: e.recurrenceId,
+    },
+    data: {
+      type: recurrenceType,
+      endDate: recurrenceEndDate,
+      interval: recurrenceInterval,
+    },
+  })
   await enqueue(e, result)
   return result
 }
 
-export async function remove(eventId: number) {
-  const [result] = await db.delete(recurrenceRules).where(eq(recurrenceRules.eventId, eventId)).returning()
-  await dequeue(result)
+export async function remove(id: number) {
+  const result = await prisma.recurrenceRule.delete({
+    where: {
+      id,
+    },
+  })
+  await dequeue(id)
   return result
 }

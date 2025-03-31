@@ -1,10 +1,8 @@
-import { eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
-import { db } from '../db'
-import { users } from '../db/schema'
 import { comparePassword, hashPassword } from '../utils/crypto'
 import { generateToken } from '../utils/jwt'
+import { prisma } from '../utils/prisma'
 
 const usernameSchema = z
   .string()
@@ -24,7 +22,11 @@ export type LoginData = z.infer<typeof loginSchema>
 export async function login(data: LoginData) {
   const { username, password } = data
 
-  const [user] = await db.select().from(users).where(eq(users.username, username))
+  const user = await prisma.user.findUnique({
+    where: {
+      username,
+    },
+  })
 
   if (!user) {
     throw new HTTPException(400, { message: '用户名或密码错误' })
@@ -45,7 +47,11 @@ export async function login(data: LoginData) {
 export async function createUser(data: LoginData) {
   const { username, password } = data
 
-  const [existingUser] = await db.select().from(users).where(eq(users.username, username))
+  const existingUser = await prisma.user.findUnique({
+    where: {
+      username,
+    },
+  })
 
   if (existingUser) {
     throw new HTTPException(400, { message: '用户名已存在' })
@@ -53,13 +59,12 @@ export async function createUser(data: LoginData) {
 
   const hashedPwd = await hashPassword(password)
 
-  const [newUser] = await db
-    .insert(users)
-    .values({
+  const newUser = await prisma.user.create({
+    data: {
       username,
       password: hashedPwd,
-    })
-    .returning()
+    },
+  })
 
   const token = await generateToken(newUser)
 
@@ -69,27 +74,29 @@ export async function createUser(data: LoginData) {
 }
 
 export async function getUserById(id: number) {
-  const [user] = await db
-    .select({
-      id: users.id,
-      username: users.username,
-      nickname: users.nickname,
-      createdAt: users.createdAt,
-      role: users.role,
-    })
-    .from(users)
-    .where(eq(users.id, id))
-    .limit(1)
+  const user = await prisma.user.findUnique({
+    where: {
+      id,
+    },
+    select: {
+      id: true,
+      username: true,
+      nickname: true,
+      createdAt: true,
+      role: true,
+    },
+  })
+
   return user
 }
 
 export async function getUsers() {
-  return db
-    .select({
-      id: users.id,
-      username: users.username,
-      nickname: users.nickname,
-      createdAt: users.createdAt,
-    })
-    .from(users)
+  return prisma.user.findMany({
+    select: {
+      id: true,
+      username: true,
+      nickname: true,
+      createdAt: true,
+    },
+  })
 }

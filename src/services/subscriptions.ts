@@ -1,60 +1,70 @@
-import { eq } from 'drizzle-orm'
-import { createInsertSchema } from 'drizzle-zod'
+import type { Subscription } from '@prisma/client'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { notificationsService } from '.'
-import { db } from '../db'
-import { subscriptions } from '../db/schema'
 import { sha256 } from '../utils/crypto'
+import { prisma } from '../utils/prisma'
 
-export const subscriptionsInsetSchema = createInsertSchema(subscriptions, {
-  endpoint: s =>
-    s.url({
-      message: '无效的订阅链接',
-    }),
-}).omit({
-  id: true,
-  createdAt: true,
+export const subscriptionInsetSchema = z.object({
+  endpoint: z.string().url({
+    message: '无效的订阅链接',
+  }),
+  auth: z.string(),
+  p256dh: z.string(),
+  deviceCode: z.string(),
+  userAgent: z.string().optional(),
 })
 
-export function generateSubscriptionKey(
-  subscription: Pick<z.infer<typeof subscriptionsInsetSchema>, 'endpoint' | 'auth' | 'p256dh'>,
-) {
+export function generateSubscriptionKey(subscription: Pick<Subscription, 'endpoint' | 'auth' | 'p256dh'>) {
   return sha256([subscription.endpoint, subscription.auth, subscription.p256dh].join('|'))
 }
 
 export async function getSubscriptionByDeviceCode(deviceCode: string) {
-  const [subscription] = await db.select().from(subscriptions).where(eq(subscriptions.deviceCode, deviceCode)).limit(1)
+  const subscription = await prisma.subscription.findUnique({
+    where: {
+      deviceCode,
+    },
+  })
   return subscription
 }
 
-export const updateSchema = subscriptionsInsetSchema.partial()
+export const updateSchema = subscriptionInsetSchema.partial()
 
 export async function updateSubscription(deviceCode: string, data: z.infer<typeof updateSchema>) {
   const existingSubscription = await getSubscriptionByCode(deviceCode)
   if (!existingSubscription) {
     throw new HTTPException(404, { message: '订阅不存在' })
   }
-  const [updated] = await db.update(subscriptions).set(data).where(eq(subscriptions.deviceCode, deviceCode)).returning()
+  const updated = await prisma.subscription.update({
+    where: {
+      deviceCode,
+    },
+    data,
+  })
   return updated
 }
 
-export async function saveSubscription(data: z.infer<typeof subscriptionsInsetSchema>) {
-  const existingSubscription = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.deviceCode, data.deviceCode),
+export async function saveSubscription(data: z.infer<typeof subscriptionInsetSchema>) {
+  const existingSubscription = await prisma.subscription.findUnique({
+    where: {
+      deviceCode: data.deviceCode,
+    },
   })
 
   if (existingSubscription) {
-    const [updated] = await db
-      .update(subscriptions)
-      .set(data)
-      .where(eq(subscriptions.deviceCode, data.deviceCode))
-      .returning()
+    const updated = await prisma.subscription.update({
+      where: {
+        deviceCode: data.deviceCode,
+      },
+      data,
+    })
 
     return updated
   }
 
-  const [newSubscription] = await db.insert(subscriptions).values(data).returning()
+  const newSubscription = await prisma.subscription.create({
+    data,
+  })
 
   await notificationsService.enqueue(newSubscription, {
     title: '订阅成功',
@@ -65,8 +75,10 @@ export async function saveSubscription(data: z.infer<typeof subscriptionsInsetSc
 }
 
 export async function getSubscriptionByCode(deviceCode: string) {
-  return db.query.subscriptions.findFirst({
-    where: eq(subscriptions.deviceCode, deviceCode),
+  return prisma.subscription.findUnique({
+    where: {
+      deviceCode,
+    },
   })
 }
 
@@ -76,5 +88,9 @@ export async function deleteSubscription(deviceCode: string) {
     throw new HTTPException(404, { message: '订阅不存在' })
   }
 
-  await db.delete(subscriptions).where(eq(subscriptions.deviceCode, deviceCode))
+  await prisma.subscription.delete({
+    where: {
+      deviceCode,
+    },
+  })
 }

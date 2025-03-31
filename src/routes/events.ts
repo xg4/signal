@@ -2,8 +2,6 @@ import { Hono } from 'hono'
 import { adminRequired } from '../middlewares/auth'
 import { zValidator } from '../middlewares/zod-validator'
 import { eventsService, recurrenceService, remindersService } from '../services'
-import { eventQuerySchema } from '../services/events'
-import { eventBatchInsetSchema, eventInsetSchema } from '../types'
 import { idValidator } from '../utils/validator'
 
 export const eventRoutes = new Hono()
@@ -14,7 +12,7 @@ eventRoutes.post('/recurrence/query', adminRequired, zValidator('json', recurren
   return c.json(result)
 })
 
-eventRoutes.post('/reminders/query', adminRequired, zValidator('json', recurrenceService.jobQuerySchema), async c => {
+eventRoutes.post('/reminders/query', adminRequired, zValidator('json', remindersService.jobQuerySchema), async c => {
   const query = c.req.valid('json')
   const result = await remindersService.getJobs(query)
   return c.json(result)
@@ -42,7 +40,7 @@ eventRoutes.get('/', async c => {
   return c.json(allEvents)
 })
 
-eventRoutes.post('/query', zValidator('json', eventQuerySchema), async c => {
+eventRoutes.post('/query', zValidator('json', eventsService.eventQuerySchema), async c => {
   const queryData = c.req.valid('json')
   const allEvents = await eventsService.query(queryData)
 
@@ -55,9 +53,9 @@ eventRoutes.get('/:id', zValidator('param', idValidator), async c => {
   return c.json(event)
 })
 
-eventRoutes.post('/', adminRequired, zValidator('json', eventInsetSchema), async c => {
+eventRoutes.post('/', adminRequired, zValidator('json', eventsService.eventInsetSchema), async c => {
   const eventData = c.req.valid('json')
-  const newEvent = await eventsService.add(eventData)
+  const newEvent = await eventsService.create(eventData)
   return c.json(newEvent, 201)
 })
 
@@ -65,7 +63,7 @@ eventRoutes.put(
   '/:id',
   adminRequired,
   zValidator('param', idValidator),
-  zValidator('json', eventInsetSchema),
+  zValidator('json', eventsService.eventInsetSchema),
   async c => {
     const { id } = c.req.valid('param')
     const updateData = c.req.valid('json')
@@ -80,7 +78,7 @@ eventRoutes.delete('/:id', adminRequired, zValidator('param', idValidator), asyn
   return c.json(null)
 })
 
-eventRoutes.post('/batch', adminRequired, zValidator('json', eventBatchInsetSchema), async c => {
+eventRoutes.post('/batch', adminRequired, zValidator('json', eventsService.eventBatchInsetSchema), async c => {
   const eventsArray = c.req.valid('json')
   const createdEvents = await eventsService.batch(eventsArray)
   return c.json(createdEvents, 201)

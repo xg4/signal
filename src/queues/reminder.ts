@@ -1,8 +1,8 @@
 import { Queue } from 'bullmq'
 import { QUEUE_NAMES, redisConnection } from '../config/queue'
-import type { Reminder } from '../types'
+import type { ReminderJob } from '../types/queue'
 
-export const reminderQueue = new Queue<Reminder>(QUEUE_NAMES.REMINDER, {
+export const reminderQueue = new Queue<ReminderJob>(QUEUE_NAMES.REMINDER, {
   connection: redisConnection,
   defaultJobOptions: {
     removeOnComplete: true,

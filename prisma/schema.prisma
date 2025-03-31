@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Event {
+  id              Int             @id @default(autoincrement())
+  name            String
+  description     String?
+  locations       String[]
+  startTime       DateTime        @map("start_time")
+  durationMinutes Int             @default(0) @map("duration_minutes")
+  reminderTimes   Int[]           @map("reminder_times")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  deletedAt       DateTime?       @map("deleted_at")
+  recurrenceId    Int?
+  recurrenceRule  RecurrenceRule? @relation(fields: [recurrenceId], references: [id])
+
+  @@index([startTime, name])
+  @@map("events")
+}
+
+model RecurrenceRule {
+  id        Int            @id @default(autoincrement())
+  type      RecurrenceType
+  interval  Int            @default(1)
+  endDate   DateTime?      @map("end_date")
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+  deletedAt DateTime?      @map("deleted_at")
+  events    Event[]
+
+  @@map("recurrence_rules")
+}
+
+model Subscription {
+  id         Int       @id @default(autoincrement())
+  endpoint   String
+  p256dh     String
+  auth       String
+  userAgent  String?   @map("user_agent")
+  deviceCode String    @unique @map("device_code")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+
+  @@index([deviceCode])
+  @@map("subscriptions")
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  username  String    @unique() @db.Citext
+  password  String
+  nickname  String?
+  role      UserRole  @default(USER)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("users")
+}
+
+enum RecurrenceType {
+  DAILY
+  WEEKLY
+  MONTHLY
+
+  @@map("recurrence_type")
+}
+
+enum UserRole {
+  GUEST
+  USER
+  ADMIN
+
+  @@map("user_role")
+}

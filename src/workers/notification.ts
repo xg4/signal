@@ -1,11 +1,9 @@
 import { Job, Worker } from 'bullmq'
-import { eq } from 'drizzle-orm'
 import { get } from 'lodash-es'
 import { QUEUE_NAMES, redisConnection } from '../config/queue'
-import { db } from '../db'
-import { subscriptions } from '../db/schema'
 import type { NotificationJob } from '../types/queue'
 import { logger as _logger } from '../utils/log'
+import { prisma } from '../utils/prisma'
 import { sendNotification } from '../utils/push'
 
 const notificationWorker = new Worker<NotificationJob>(QUEUE_NAMES.NOTIFICATION, processNotificationJob, {
@@ -33,12 +31,14 @@ notificationWorker.on('failed', async (job, err) => {
   const status: any = get(err, 'statusCode')
   const code: any = get(err, 'code')
   if (([410, 404, 400].includes(status) || code === 'ConnectionRefused') && job?.data) {
-    await db
-      .update(subscriptions)
-      .set({
+    await prisma.subscription.update({
+      where: {
+        id: job.data.subscription.id,
+      },
+      data: {
         deletedAt: new Date(),
-      })
-      .where(eq(subscriptions.id, job.data.subscription.id))
+      },
+    })
     logger.info(err, `🚫 订阅 ${job.data.subscription.id} 无效，已从数据库中移除`)
     return
   }

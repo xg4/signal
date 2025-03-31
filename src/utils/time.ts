@@ -1,6 +1,6 @@
 import dayjs, { Dayjs } from 'dayjs'
 import { isNil } from 'lodash-es'
-import type { z } from 'zod'
+import { z } from 'zod'
 import type { recurrenceTypeSchema } from '../types'
 
 export const SECONDS_A_MINUTE = 60
@@ -25,9 +25,9 @@ export function isSameDate(a?: Date | null, b?: Date | null) {
 }
 
 const recurrenceTypeMap = {
-  daily: 'day',
-  weekly: 'week',
-  monthly: 'month',
+  DAILY: 'day',
+  WEEKLY: 'week',
+  MONTHLY: 'month',
 } as const
 
 export function getNextTime(d: Dayjs, type: z.infer<typeof recurrenceTypeSchema>, interval = 1) {

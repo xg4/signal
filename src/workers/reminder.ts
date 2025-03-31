@@ -1,29 +1,30 @@
 import { Job, Worker } from 'bullmq'
 import dayjs from 'dayjs'
-import { and, eq, isNull } from 'drizzle-orm'
 import { QUEUE_NAMES, redisConnection } from '../config/queue'
-import { db } from '../db'
-import { events } from '../db/schema'
-import { notificationsService, remindersService } from '../services'
-import type { Reminder } from '../types'
+import { notificationsService } from '../services'
+import type { ReminderJob } from '../types/queue'
 import { logger as _logger } from '../utils/log'
+import { prisma } from '../utils/prisma'
 
 // 创建邮件工作进程处理函数
-const processReminderJob = async (job: Job<Reminder>) => {
-  const { id, scheduledAt, eventId } = job.data
+const processReminderJob = async (job: Job<ReminderJob>) => {
+  const { scheduledAt, eventId } = job.data
 
   const diffInMinutes = Math.abs(dayjs().diff(scheduledAt, 'minutes'))
   if (diffInMinutes > 5) {
-    logger.info(`❌ 提醒 ${id} 已过期，跳过处理`)
+    logger.info(`❌ 提醒 ${job.id} 已过期，跳过处理`)
     return
   }
 
-  logger.info(`⏰ 正在处理事件 ${eventId} 的提醒 ${id}`)
+  logger.info(`⏰ 正在处理事件 ${eventId} 的提醒 ${job.id}`)
 
   // Get event details - we already have the event from the reminder object
   // but we can refresh it to make sure we have the latest data
-  const freshEvent = await db.query.events.findFirst({
-    where: and(eq(events.id, eventId), isNull(events.deletedAt)),
+  const freshEvent = await prisma.event.findUnique({
+    where: {
+      id: eventId,
+      deletedAt: null,
+    },
   })
 
   if (!freshEvent) {
@@ -32,8 +33,10 @@ const processReminderJob = async (job: Job<Reminder>) => {
   }
 
   // Get user subscriptions
-  const userSubscriptions = await db.query.subscriptions.findMany({
-    where: isNull(events.deletedAt),
+  const userSubscriptions = await prisma.subscription.findMany({
+    where: {
+      deletedAt: null,
+    },
   })
 
   if (userSubscriptions.length === 0) {
@@ -52,14 +55,14 @@ const processReminderJob = async (job: Job<Reminder>) => {
       body,
     }
     const job = await notificationsService.enqueue(s, payload)
-    logger.info(`📬 已为提醒 ${id} 向订阅 ${s.id} 发送通知 ${job.id}`)
+    logger.info(`📬 已为提醒 ${job.id} 向订阅 ${s.id} 发送通知`)
   })
 
   const results = await Promise.allSettled(notificationPromises)
-  logger.info(`📊 为提醒 ${id} 成功发送了 ${results.filter(i => i.status === 'fulfilled').length} 条通知`)
+  logger.info(`📊 为提醒 ${job.id} 成功发送了 ${results.filter(i => i.status === 'fulfilled').length} 条通知`)
 }
 
-const reminderWorker = new Worker<Reminder>(QUEUE_NAMES.REMINDER, processReminderJob, {
+const reminderWorker = new Worker<ReminderJob>(QUEUE_NAMES.REMINDER, processReminderJob, {
   connection: redisConnection,
   concurrency: 10,
 })
@@ -67,10 +70,10 @@ const reminderWorker = new Worker<Reminder>(QUEUE_NAMES.REMINDER, processReminde
 const logger = _logger.child({ worker: ['⏰', reminderWorker.name].join(': ') })
 
 // 监听事件
-reminderWorker.on('completed', async (job: Job<Reminder>) => {
-  await Promise.all([job.updateProgress(100), remindersService.markAsSent(job.data.id)])
+reminderWorker.on('completed', async (job: Job<ReminderJob>) => {
+  await job.updateProgress(100)
 
-  logger.info(`✨ 提醒 ${job.data.id} 已成功处理`)
+  logger.info(`✨ 提醒 ${job.id} 已成功处理`)
 })
 
 reminderWorker.on('failed', (job, err) => {

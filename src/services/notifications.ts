@@ -1,5 +1,5 @@
+import type { Subscription } from '@prisma/client'
 import { notificationQueue } from '../queues/notification'
-import type { Subscription } from '../types'
 import type { NotificationPayload } from '../utils/push'
 
 export async function enqueue(subscription: Subscription, payload: NotificationPayload) {
