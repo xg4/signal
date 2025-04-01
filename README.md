@@ -1,6 +1,6 @@
 # Signal - Event Notification System
 
-A Node.js-based event notification system with web push capabilities.
+A Bun-based event notification system with web push capabilities.
 
 ## Features
 
@@ -8,22 +8,54 @@ A Node.js-based event notification system with web push capabilities.
 - Scheduled notifications
 - Web push notifications
 - User authentication
-- PostgreSQL database with Drizzle ORM
+- PostgreSQL database with Prisma ORM
+- Queue system for reliable notification delivery
+- Recurring events support
+
+## Docker Deployment
+
+### Quick Start
+
+The system requires two containers to function properly:
+
+1. **API Server** - Handles HTTP requests and API endpoints
+2. **Worker** - Processes background tasks (scheduled notifications, recurring events)
+
+Run both containers with these commands:
+
+```bash
+# Start the API server
+docker run -d \
+  --name signal-api \
+  --env-file .env \
+  --network host \
+  --restart unless-stopped \
+  ghcr.io/xg4/signal:latest run start
+
+# Start the background worker
+docker run -d \
+  --name signal-worker \
+  --env-file .env \
+  --network host \
+  --restart unless-stopped \
+  ghcr.io/xg4/signal:latest run start:worker
+```
 
 ## Tech Stack
 
+- **Runtime**: Bun
 - **Backend Framework**: Hono.js
-- **Database**: PostgreSQL + Drizzle ORM
+- **Database**: PostgreSQL + Prisma ORM
 - **Authentication**: JWT
-- **Scheduling**: cron
+- **Queue System**: BullMQ + Redis
 - **Notifications**: web-push
 - **Language**: TypeScript
 
 ## Prerequisites
 
-- Node.js 18+
+- Bun 1.x
 - PostgreSQL
-- npm or yarn
+- Redis
 
 ## Installation
 
@@ -92,19 +124,13 @@ Build the Docker image:
 docker build -t signal-app .
 ```
 
-Run the container:
-
-```bash
-docker run -p 3000:3000 --env-file .env signal-app
-```
-
 ## API Endpoints
 
 ### Authentication
 
-- `POST /api/users/register` - Register a new user
-- `POST /api/users/login` - Login a user
-- `GET /api/users/me` - Get current user info
+- `POST /api/register` - Register a new user
+- `POST /api/login` - Login a user
+- `GET /api/me` - userRequired - Get current user info
 
 ### Events
 
@@ -117,9 +143,9 @@ docker run -p 3000:3000 --env-file .env signal-app
 
 ### Subscriptions
 
-- `GET /api/subscriptions` - Get all subscriptions for current user
 - `POST /api/subscriptions` - Create a new subscription
-- `DELETE /api/subscriptions` - Delete a subscription
+- `DELETE /api/subscriptions/:id` - Delete a subscription by ID
+- `GET /api/subscriptions` - Get all subscriptions for current user
 
 ## Testing Web Push
 
