@@ -26,6 +26,8 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/package.json ./package.json
 
+RUN bun run db:generate
+
 EXPOSE 3789/tcp
 
 ENV PORT=3789

@@ -17,6 +17,7 @@
   "scripts": {
     "dev": "bun run --watch --env-file=.env src/index.ts",
     "dev:worker": "bun run --watch --env-file=.env src/workers/index.ts",
+    "db:generate": "prisma generate",
     "start": "prisma migrate deploy && bun run src/index.ts",
     "start:worker": "prisma migrate deploy && bun run src/workers"
   },
