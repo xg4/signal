@@ -52,7 +52,7 @@ async function processRecurrenceJob(job: Job<RecurrenceJob>) {
   )
   logger.info(`🔄 事件 ${freshEvent.id} 的下一个时间是 ${nextTime.format('YYYY-MM-DD HH:mm:ss')}`)
 
-  await eventsService.copy(freshEvent, nextTime.toDate())
+  await eventsService.copy(freshEvent.id, nextTime.toDate())
 }
 
 const recurrenceWorker = new Worker<RecurrenceJob>(QUEUE_NAMES.RECURRENCE, processRecurrenceJob, {

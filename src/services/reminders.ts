@@ -7,8 +7,11 @@ import { reminderQueue } from '../queues/reminder'
 
 export async function getCounts() {
   const counts = await reminderQueue.getJobCounts()
-
   return counts
+}
+
+export function clear() {
+  return reminderQueue.obliterate({ force: true })
 }
 
 export const jobQuerySchema = z.object({
@@ -16,22 +19,32 @@ export const jobQuerySchema = z.object({
     current: z.coerce.number().default(1),
     pageSize: z.coerce.number().default(20),
     name: z.string().trim().optional(),
+    id: z.string().trim().optional(),
   }),
 })
+
+export function getJob(jobId: string) {
+  return reminderQueue.getJob(jobId)
+}
 
 export async function getJobs({ params }: z.infer<typeof jobQuerySchema>) {
   const limit = params.pageSize
   const offset = (params.current - 1) * params.pageSize
-  const jobs = await reminderQueue.getJobs([], offset, offset + limit)
+  const jobs = await reminderQueue.getJobs([])
 
-  const filteredJobs = jobs.filter(j => {
-    if (params.name) {
-      return j.name.includes(params.name)
-    }
-    return true
-  })
+  const filteredJobs = jobs
+    .filter(j => {
+      if (params.name) {
+        return j.name.includes(params.name)
+      }
+      if (params.id) {
+        return j.id?.includes(params.id)
+      }
+      return true
+    })
+    .slice(offset, offset + limit)
 
-  return { data: filteredJobs, total: filteredJobs.length }
+  return { data: filteredJobs, total: jobs.length }
 }
 
 export async function getStatus(key: string) {
@@ -44,23 +57,28 @@ export async function getStatus(key: string) {
   return { ...pick(job, ['id', 'progress', 'attemptsMade', 'timestamp', 'queueName']), state }
 }
 
-export function enqueue(e: Event, times?: number[]) {
-  if (!e.reminderTimes.length) {
-    return null
-  }
+export function generateJobId(eventId: number, minutes: number) {
+  return [eventId, minutes].join('_')
+}
+
+export function getScheduledAt(startTime: Date, minutes: number) {
+  return dayjs(startTime).subtract(minutes, 'minutes')
+}
+
+export function enqueue(e: Event, times: number[]) {
   return Promise.all(
-    (times || e.reminderTimes).map(m => {
-      const scheduledAt = dayjs(e.startTime).add(m, 'minutes')
+    times.map(m => {
+      const scheduledAt = getScheduledAt(e.startTime, m)
       const delay = scheduledAt.diff(dayjs(), 'ms')
       return reminderQueue.add(
-        'reminder',
+        [e.name, dayjs(e.startTime).format('MM-DD HH:mm'), m].join(' - '),
         {
           eventId: e.id,
           scheduledAt: scheduledAt.toDate(),
         },
         {
           delay: Math.max(delay, 1e3),
-          jobId: [e.id, m].join('-'),
+          jobId: generateJobId(e.id, m),
         },
       )
     }),
@@ -72,9 +90,8 @@ export async function dequeue(eventId: number, times: number[]) {
     return null
   }
   return Promise.all(
-    times.map(r => {
-      const id = [eventId, r].join('-')
-      return reminderQueue.remove(id)
+    times.map(m => {
+      return reminderQueue.remove(generateJobId(eventId, m))
     }),
   )
 }

@@ -5,7 +5,7 @@ import type { ReminderJob } from '../types/queue'
 export const reminderQueue = new Queue<ReminderJob>(QUEUE_NAMES.REMINDER, {
   connection: redisConnection,
   defaultJobOptions: {
-    removeOnComplete: true,
+    // removeOnComplete: true,
     attempts: 3,
     backoff: {
       type: 'exponential',

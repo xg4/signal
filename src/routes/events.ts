@@ -1,10 +1,16 @@
 import { Hono } from 'hono'
 import { adminRequired } from '../middlewares/auth'
 import { zValidator } from '../middlewares/zod-validator'
-import { eventsService, recurrenceService, remindersService } from '../services'
+import { eventsService, notificationsService, recurrenceService, remindersService } from '../services'
 import { idValidator } from '../utils/validator'
 
 export const eventRoutes = new Hono()
+
+eventRoutes.post('/message/query', adminRequired, zValidator('json', notificationsService.jobQuerySchema), async c => {
+  const query = c.req.valid('json')
+  const result = await notificationsService.getJobs(query)
+  return c.json(result)
+})
 
 eventRoutes.post('/recurrence/query', adminRequired, zValidator('json', recurrenceService.jobQuerySchema), async c => {
   const query = c.req.valid('json')
@@ -20,7 +26,7 @@ eventRoutes.post('/reminders/query', adminRequired, zValidator('json', reminders
 
 eventRoutes.get('/recurrence/:key', adminRequired, async c => {
   const { key } = c.req.param()
-  const result = await recurrenceService.getStatus(key)
+  const result = await recurrenceService.getJobScheduler(key)
   return c.json(result)
 })
 

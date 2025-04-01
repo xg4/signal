@@ -5,7 +5,7 @@ import type { NotificationJob } from '../types/queue'
 export const notificationQueue = new Queue<NotificationJob>(QUEUE_NAMES.NOTIFICATION, {
   connection: redisConnection,
   defaultJobOptions: {
-    removeOnComplete: true,
+    // removeOnComplete: true,
     attempts: 3,
     backoff: {
       type: 'fixed',
