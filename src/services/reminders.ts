@@ -69,7 +69,7 @@ export function enqueue(e: Event, times: number[]) {
   return Promise.all(
     times.map(m => {
       const scheduledAt = getScheduledAt(e.startTime, m)
-      const delay = scheduledAt.diff(dayjs(), 'ms')
+      const delay = Math.max(scheduledAt.diff(dayjs(), 'ms'), 1e3)
       return reminderQueue.add(
         [e.name, dayjs(e.startTime).format('MM-DD HH:mm'), m].join(' - '),
         {
@@ -77,7 +77,7 @@ export function enqueue(e: Event, times: number[]) {
           scheduledAt: scheduledAt.toDate(),
         },
         {
-          delay: Math.max(delay, 1e3),
+          delay,
           jobId: generateJobId(e.id, m),
         },
       )

@@ -88,11 +88,9 @@ export async function getJobs({ params }: z.infer<typeof jobQuerySchema>) {
     })
     .slice(offset, offset + limit)
 
-  const list = await recurrenceQueue.getJobSchedulers()
   return {
     data: filteredJobs,
     total: jobs.length,
-    list,
   }
 }
 

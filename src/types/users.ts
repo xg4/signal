@@ -5,9 +5,9 @@ import { z } from 'zod'
 export type JwtUser = {
   userId: number
   username: string
-  userRole: z.infer<typeof UserRoleSchema>
+  userRole: z.infer<typeof userRoleSchema>
 }
 
 export type JwtPayload = JwtVariables<JwtUser>
 
-export const UserRoleSchema = z.nativeEnum(UserRole)
+export const userRoleSchema = z.nativeEnum(UserRole)

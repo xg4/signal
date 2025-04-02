@@ -1,9 +1,46 @@
-import type { Subscription } from '@prisma/client'
+import type { Prisma, Subscription } from '@prisma/client'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { notificationsService } from '.'
 import { sha256 } from '../utils/crypto'
 import { prisma } from '../utils/prisma'
+
+export const paramsSchema = z.object({
+  pageSize: z.coerce.number().default(20),
+  current: z.coerce.number().default(1),
+  endpoint: z.string().trim().optional(),
+})
+
+export const querySchema = z.object({
+  params: paramsSchema,
+})
+
+function generateConditions(params: z.infer<typeof paramsSchema>) {
+  const conditions: Prisma.SubscriptionWhereInput = {
+    endpoint: {
+      startsWith: params.endpoint,
+    },
+    deletedAt: null,
+  }
+
+  return conditions
+}
+
+export function getCount(params: z.infer<typeof paramsSchema>) {
+  return prisma.subscription.count({
+    where: generateConditions(params),
+  })
+}
+
+export function query({ params }: z.infer<typeof querySchema>) {
+  const take = params.pageSize
+  const skip = (params.current - 1) * params.pageSize
+  return prisma.subscription.findMany({
+    where: generateConditions(params),
+    take,
+    skip,
+  })
+}
 
 export const subscriptionInsetSchema = z.object({
   endpoint: z.string().url({
@@ -30,7 +67,7 @@ export async function getSubscriptionByDeviceCode(deviceCode: string) {
 
 export const updateSchema = subscriptionInsetSchema.partial()
 
-export async function updateSubscription(deviceCode: string, data: z.infer<typeof updateSchema>) {
+export async function update(deviceCode: string, data: z.infer<typeof updateSchema>) {
   const existingSubscription = await getSubscriptionByCode(deviceCode)
   if (!existingSubscription) {
     throw new HTTPException(404, { message: '订阅不存在' })
@@ -44,7 +81,7 @@ export async function updateSubscription(deviceCode: string, data: z.infer<typeo
   return updated
 }
 
-export async function saveSubscription(data: z.infer<typeof subscriptionInsetSchema>) {
+export async function create(data: z.infer<typeof subscriptionInsetSchema>) {
   const existingSubscription = await prisma.subscription.findUnique({
     where: {
       deviceCode: data.deviceCode,
@@ -82,7 +119,7 @@ export async function getSubscriptionByCode(deviceCode: string) {
   })
 }
 
-export async function deleteSubscription(deviceCode: string) {
+export async function remove(deviceCode: string) {
   const existingSubscription = await getSubscriptionByCode(deviceCode)
   if (!existingSubscription) {
     throw new HTTPException(404, { message: '订阅不存在' })

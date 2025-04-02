@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client'
 import dayjs from 'dayjs'
 import { HTTPException } from 'hono/http-exception'
 import { difference, omit, pick } from 'lodash-es'
@@ -8,13 +9,15 @@ import { prisma } from '../utils/prisma'
 
 export const sortOrder = z.enum(['ascend', 'descend'])
 
+export const eventParamsSchema = z.object({
+  pageSize: z.coerce.number().default(20),
+  current: z.coerce.number().default(1),
+  name: z.string().trim().optional(),
+  startTime: z.coerce.date().array().optional(),
+})
+
 export const eventQuerySchema = z.object({
-  params: z.object({
-    startTime: z.coerce.date().array().optional(),
-    pageSize: z.coerce.number().default(20),
-    current: z.coerce.number().default(1),
-    name: z.string().optional(),
-  }),
+  params: eventParamsSchema,
   sort: z
     .object({
       startTime: sortOrder,
@@ -60,28 +63,35 @@ export async function init() {
   )
 }
 
+export async function getCount(params: z.infer<typeof eventParamsSchema>) {
+  const conditions = generateConditions(params)
+
+  return prisma.event.count({
+    where: conditions,
+  })
+}
+
+function generateConditions(params: z.infer<typeof eventParamsSchema>) {
+  const [gte, lte] = params.startTime || []
+  const conditions: Prisma.EventWhereInput = {
+    startTime: {
+      gte,
+      lte,
+    },
+    name: {
+      startsWith: params.name,
+    },
+    deletedAt: null,
+  }
+
+  return conditions
+}
+
 /**
  * 获取指定时间范围内的所有事件
  */
 export async function query({ params, sort }: z.infer<typeof eventQuerySchema>) {
-  const conditions: any = {
-    startTime: {},
-    name: {},
-  }
-  if (params.startTime) {
-    const [start, end] = params.startTime
-    if (start) {
-      conditions.startTime.gte = start
-    }
-    if (end) {
-      conditions.startTime.lte = end
-    }
-  }
-  if (params.name) {
-    conditions.name.contains = params.name
-  }
-
-  conditions.deletedAt = null
+  const conditions = generateConditions(params)
 
   const take = params.pageSize
   const skip = (params.current - 1) * params.pageSize
@@ -98,25 +108,15 @@ export async function query({ params, sort }: z.infer<typeof eventQuerySchema>) 
   }
   orderBy.updatedAt = 'desc'
 
-  const [total, data] = await Promise.all([
-    prisma.event.count({
-      where: conditions,
-    }),
-    prisma.event.findMany({
-      where: conditions,
-      orderBy,
-      skip,
-      take,
-      include: {
-        recurrenceRule: true,
-      },
-    }),
-  ])
-
-  return {
-    data,
-    total,
-  }
+  return prisma.event.findMany({
+    where: conditions,
+    orderBy,
+    skip,
+    take,
+    include: {
+      recurrenceRule: true,
+    },
+  })
 }
 
 /**

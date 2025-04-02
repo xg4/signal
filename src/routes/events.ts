@@ -48,9 +48,12 @@ eventRoutes.get('/', async c => {
 
 eventRoutes.post('/query', zValidator('json', eventsService.eventQuerySchema), async c => {
   const queryData = c.req.valid('json')
-  const allEvents = await eventsService.query(queryData)
+  const [data, total] = await Promise.all([eventsService.query(queryData), eventsService.getCount(queryData.params)])
 
-  return c.json(allEvents)
+  return c.json({
+    data,
+    total,
+  })
 })
 
 eventRoutes.get('/:id', zValidator('param', idValidator), async c => {

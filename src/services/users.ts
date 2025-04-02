@@ -1,5 +1,7 @@
+import type { Prisma } from '@prisma/client'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
+import { userRoleSchema } from '../types'
 import { comparePassword, hashPassword } from '../utils/crypto'
 import { generateToken } from '../utils/jwt'
 import { prisma } from '../utils/prisma'
@@ -90,13 +92,55 @@ export async function getUserById(id: number) {
   return user
 }
 
-export async function getUsers() {
+export const userParamsSchema = z.object({
+  pageSize: z.coerce.number().default(20),
+  current: z.coerce.number().default(1),
+  createdAt: z.coerce.date().array().optional(),
+  username: z.string().trim().optional(),
+  role: userRoleSchema.optional(),
+})
+
+export const userQuerySchema = z.object({
+  params: userParamsSchema,
+})
+
+function generateConditions(params: z.infer<typeof userParamsSchema>) {
+  const [gte, lte] = params.createdAt || []
+  const conditions: Prisma.UserWhereInput = {
+    createdAt: {
+      gte,
+      lte,
+    },
+    username: {
+      startsWith: params.username,
+    },
+    role: params.role,
+    deletedAt: null,
+  }
+
+  return conditions
+}
+
+export async function getCount(params: z.infer<typeof userParamsSchema>) {
+  return prisma.user.count({
+    where: generateConditions(params),
+  })
+}
+
+export async function getUsers({ params }: z.infer<typeof userQuerySchema>) {
+  const take = params.pageSize
+  const skip = (params.current - 1) * params.pageSize
+
   return prisma.user.findMany({
+    where: generateConditions(params),
     select: {
       id: true,
       username: true,
       nickname: true,
+      role: true,
       createdAt: true,
     },
+    take,
+    skip,
   })
 }
