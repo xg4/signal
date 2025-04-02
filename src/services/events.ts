@@ -5,65 +5,74 @@ import { difference, omit, pick } from 'lodash-es'
 import { z } from 'zod'
 import { recurrenceService, remindersService } from '.'
 import { dateLikeToDate, recurrenceTypeSchema } from '../types'
+import { generateOffset, orderSchema, pageSchema } from '../utils/filter'
 import { prisma } from '../utils/prisma'
 
-export const sortOrder = z.enum(['ascend', 'descend'])
+export const paramsSchema = z
+  .object({
+    name: z.string().trim(),
+    startTime: z.coerce.date().array(),
+  })
+  .partial()
 
-export const eventParamsSchema = z.object({
-  pageSize: z.coerce.number().default(20),
-  current: z.coerce.number().default(1),
-  name: z.string().trim().optional(),
-  startTime: z.coerce.date().array().optional(),
-})
+export const sortSchema = z
+  .object({
+    startTime: orderSchema,
+  })
+  .partial()
 
-export const eventQuerySchema = z.object({
-  params: eventParamsSchema,
-  sort: z
-    .object({
-      startTime: sortOrder,
-    })
-    .partial()
-    .optional(),
+export const querySchema = z.object({
+  params: paramsSchema.merge(pageSchema),
+  sort: sortSchema,
 })
 
 export async function init() {
   await Promise.all([remindersService.clear(), recurrenceService.clear()])
 
-  const events = await prisma.event.findMany({
-    where: {
-      startTime: {
-        gte: new Date(),
+  const initReminders = async () => {
+    const events = await prisma.event.findMany({
+      where: {
+        startTime: {
+          gte: new Date(),
+        },
+        deletedAt: null,
       },
-      deletedAt: null,
-    },
-  })
+    })
 
-  await Promise.all(
-    events.map(async e => {
-      if (e.reminderTimes.length) {
-        await remindersService.enqueue(e, e.reminderTimes)
-      }
-    }),
-  )
+    await Promise.all(
+      events.map(async e => {
+        if (e.reminderTimes.length) {
+          await remindersService.enqueue(e, e.reminderTimes)
+        }
+      }),
+    )
+  }
 
-  const rules = await prisma.recurrenceRule.findMany({
-    include: {
-      events: {
-        orderBy: {
-          startTime: 'desc',
+  const initRecurrence = async () => {
+    const rules = await prisma.recurrenceRule.findMany({
+      include: {
+        events: {
+          where: {
+            deletedAt: null,
+          },
+          orderBy: {
+            startTime: 'desc',
+          },
         },
       },
-    },
-  })
-  await Promise.all(
-    rules.map(async r => {
-      const [e] = r.events
-      await recurrenceService.enqueue(e, r)
-    }),
-  )
+    })
+    await Promise.all(
+      rules.map(async r => {
+        const [e] = r.events
+        await recurrenceService.enqueue(e, r)
+      }),
+    )
+  }
+
+  await Promise.all([initReminders(), initRecurrence()])
 }
 
-export async function getCount(params: z.infer<typeof eventParamsSchema>) {
+export async function getCount(params: z.infer<typeof paramsSchema>) {
   const conditions = generateConditions(params)
 
   return prisma.event.count({
@@ -71,7 +80,7 @@ export async function getCount(params: z.infer<typeof eventParamsSchema>) {
   })
 }
 
-function generateConditions(params: z.infer<typeof eventParamsSchema>) {
+function generateConditions(params: z.infer<typeof paramsSchema>) {
   const [gte, lte] = params.startTime || []
   const conditions: Prisma.EventWhereInput = {
     startTime: {
@@ -87,35 +96,33 @@ function generateConditions(params: z.infer<typeof eventParamsSchema>) {
   return conditions
 }
 
-/**
- * 获取指定时间范围内的所有事件
- */
-export async function query({ params, sort }: z.infer<typeof eventQuerySchema>) {
-  const conditions = generateConditions(params)
-
-  const take = params.pageSize
-  const skip = (params.current - 1) * params.pageSize
-
-  const orderBy: any = {}
-  if (sort) {
-    if (sort.startTime) {
-      if (sort.startTime === 'ascend') {
-        orderBy.startTime = 'asc'
-      } else {
-        orderBy.startTime = 'desc'
-      }
-    }
-  }
-  orderBy.updatedAt = 'desc'
-
+export async function getAll() {
   return prisma.event.findMany({
-    where: conditions,
-    orderBy,
-    skip,
-    take,
+    where: {
+      deletedAt: null,
+    },
     include: {
       recurrenceRule: true,
     },
+  })
+}
+
+/**
+ * 获取指定时间范围内的所有事件
+ */
+export async function query({ params, sort }: z.infer<typeof querySchema>) {
+  return prisma.event.findMany({
+    where: generateConditions(params),
+    orderBy: [
+      sort,
+      {
+        updatedAt: 'desc',
+      },
+    ],
+    include: {
+      recurrenceRule: true,
+    },
+    ...generateOffset(params),
   })
 }
 

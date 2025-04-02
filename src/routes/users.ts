@@ -11,7 +11,7 @@ userRoutes.get('/me', userRequired, async c => {
   return c.json(user)
 })
 
-userRoutes.post('/users/query', adminRequired, zValidator('json', usersService.userQuerySchema), async c => {
+userRoutes.post('/users/query', adminRequired, zValidator('json', usersService.querySchema), async c => {
   const queryData = c.req.valid('json')
   const [data, total] = await Promise.all([usersService.getUsers(queryData), usersService.getCount(queryData.params)])
   return c.json({

@@ -3,6 +3,7 @@ import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { userRoleSchema } from '../types'
 import { comparePassword, hashPassword } from '../utils/crypto'
+import { generateOffset, orderSchema, pageSchema } from '../utils/filter'
 import { generateToken } from '../utils/jwt'
 import { prisma } from '../utils/prisma'
 
@@ -92,19 +93,26 @@ export async function getUserById(id: number) {
   return user
 }
 
-export const userParamsSchema = z.object({
-  pageSize: z.coerce.number().default(20),
-  current: z.coerce.number().default(1),
-  createdAt: z.coerce.date().array().optional(),
-  username: z.string().trim().optional(),
-  role: userRoleSchema.optional(),
+export const paramsSchema = z
+  .object({
+    username: z.string().trim(),
+    role: userRoleSchema,
+    createdAt: z.coerce.date().array(),
+  })
+  .partial()
+
+export const sortSchema = z
+  .object({
+    createdAt: orderSchema,
+  })
+  .partial()
+
+export const querySchema = z.object({
+  params: paramsSchema.merge(pageSchema),
+  sort: sortSchema,
 })
 
-export const userQuerySchema = z.object({
-  params: userParamsSchema,
-})
-
-function generateConditions(params: z.infer<typeof userParamsSchema>) {
+function generateConditions(params: z.infer<typeof paramsSchema>) {
   const [gte, lte] = params.createdAt || []
   const conditions: Prisma.UserWhereInput = {
     createdAt: {
@@ -121,16 +129,13 @@ function generateConditions(params: z.infer<typeof userParamsSchema>) {
   return conditions
 }
 
-export async function getCount(params: z.infer<typeof userParamsSchema>) {
+export async function getCount(params: z.infer<typeof paramsSchema>) {
   return prisma.user.count({
     where: generateConditions(params),
   })
 }
 
-export async function getUsers({ params }: z.infer<typeof userQuerySchema>) {
-  const take = params.pageSize
-  const skip = (params.current - 1) * params.pageSize
-
+export async function getUsers({ params, sort }: z.infer<typeof querySchema>) {
   return prisma.user.findMany({
     where: generateConditions(params),
     select: {
@@ -140,7 +145,7 @@ export async function getUsers({ params }: z.infer<typeof userQuerySchema>) {
       role: true,
       createdAt: true,
     },
-    take,
-    skip,
+    orderBy: sort,
+    ...generateOffset(params),
   })
 }

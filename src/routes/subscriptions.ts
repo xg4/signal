@@ -2,7 +2,8 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { adminRequired } from '../middlewares/auth'
 import { zValidator } from '../middlewares/zod-validator'
-import { subscriptionsService } from '../services'
+import { notificationsService, subscriptionsService } from '../services'
+import { idValidator } from '../utils/validator'
 
 export const subscriptionRoutes = new Hono()
 
@@ -50,6 +51,34 @@ subscriptionRoutes.post(
   },
 )
 
+subscriptionRoutes.post('/query', adminRequired, zValidator('json', subscriptionsService.querySchema), async c => {
+  const queryData = c.req.valid('json')
+  const [data, total] = await Promise.all([
+    subscriptionsService.query(queryData),
+    subscriptionsService.getCount(queryData.params),
+  ])
+
+  return c.json({ data, total })
+})
+
+subscriptionRoutes.post(
+  '/:id',
+  zValidator('param', idValidator),
+  zValidator(
+    'json',
+    z.object({
+      title: z.string().trim(),
+      content: z.string().trim(),
+    }),
+  ),
+  async c => {
+    const { id } = c.req.valid('param')
+    const data = c.req.valid('json')
+    const result = await notificationsService.send(id, data)
+    return c.json(result, 201)
+  },
+)
+
 const deviceCodeSchema = z.object({
   code: z
     .string({
@@ -83,14 +112,4 @@ subscriptionRoutes.get('/:code', zValidator('param', deviceCodeSchema), async c 
   }
 
   return c.json(!!existingSubscription)
-})
-
-subscriptionRoutes.post('/query', adminRequired, zValidator('json', subscriptionsService.querySchema), async c => {
-  const queryData = c.req.valid('json')
-  const [data, total] = await Promise.all([
-    subscriptionsService.query(queryData),
-    subscriptionsService.getCount(queryData.params),
-  ])
-
-  return c.json({ data, total })
 })

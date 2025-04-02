@@ -6,7 +6,7 @@ import { idValidator } from '../utils/validator'
 
 export const eventRoutes = new Hono()
 
-eventRoutes.post('/message/query', adminRequired, zValidator('json', notificationsService.jobQuerySchema), async c => {
+eventRoutes.post('/message/query', adminRequired, zValidator('json', notificationsService.userSchema), async c => {
   const query = c.req.valid('json')
   const result = await notificationsService.getJobs(query)
   return c.json(result)
@@ -18,7 +18,7 @@ eventRoutes.post('/recurrence/query', adminRequired, zValidator('json', recurren
   return c.json(result)
 })
 
-eventRoutes.post('/reminders/query', adminRequired, zValidator('json', remindersService.jobQuerySchema), async c => {
+eventRoutes.post('/reminders/query', adminRequired, zValidator('json', remindersService.querySchema), async c => {
   const query = c.req.valid('json')
   const result = await remindersService.getJobs(query)
   return c.json(result)
@@ -37,19 +37,13 @@ eventRoutes.get('/reminder/:key', adminRequired, async c => {
 })
 
 eventRoutes.get('/', async c => {
-  const allEvents = await eventsService.query({
-    params: {
-      pageSize: 10000,
-      current: 1,
-    },
-  })
+  const allEvents = await eventsService.getAll()
   return c.json(allEvents)
 })
 
-eventRoutes.post('/query', zValidator('json', eventsService.eventQuerySchema), async c => {
+eventRoutes.post('/query', zValidator('json', eventsService.querySchema), async c => {
   const queryData = c.req.valid('json')
   const [data, total] = await Promise.all([eventsService.query(queryData), eventsService.getCount(queryData.params)])
-
   return c.json({
     data,
     total,

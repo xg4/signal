@@ -4,6 +4,7 @@ import { pick } from 'lodash-es'
 import { z } from 'zod'
 import type { eventsService } from '.'
 import { recurrenceQueue } from '../queues/recurrence'
+import { generateOffset, pageSchema } from '../utils/filter'
 import { prisma } from '../utils/prisma'
 
 export function clear() {
@@ -58,39 +59,36 @@ export async function dequeue(recurrenceId: number) {
 }
 
 export const jobQuerySchema = z.object({
-  params: z.object({
-    current: z.coerce.number().default(1),
-    pageSize: z.coerce.number().default(20),
-
-    repeatJobKey: z.string().trim().optional(),
-    id: z.string().trim().optional(),
-    name: z.string().trim().optional(),
-  }),
+  params: z
+    .object({
+      repeatJobKey: z.string().trim(),
+      id: z.string().trim(),
+      name: z.string().trim(),
+    })
+    .partial()
+    .merge(pageSchema),
 })
 
 export async function getJobs({ params }: z.infer<typeof jobQuerySchema>) {
-  const limit = params.pageSize
-  const offset = (params.current - 1) * params.pageSize
   const jobs = await recurrenceQueue.getJobs([])
+  const filteredJobs = jobs.filter(j => {
+    if (params.repeatJobKey) {
+      return j.repeatJobKey?.includes(params.repeatJobKey)
+    }
+    if (params.id) {
+      return j.id?.includes(params.id)
+    }
+    if (params.name) {
+      return j.name?.includes(params.name)
+    }
+    return true
+  })
 
-  const filteredJobs = jobs
-    .filter(j => {
-      if (params.repeatJobKey) {
-        return j.repeatJobKey?.includes(params.repeatJobKey)
-      }
-      if (params.id) {
-        return j.id?.includes(params.id)
-      }
-      if (params.name) {
-        return j.name?.includes(params.name)
-      }
-      return true
-    })
-    .slice(offset, offset + limit)
+  const { take, skip } = generateOffset(params)
 
   return {
-    data: filteredJobs,
-    total: jobs.length,
+    data: filteredJobs.slice(skip, skip + take),
+    total: filteredJobs.length,
   }
 }
 

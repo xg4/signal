@@ -3,13 +3,15 @@ import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { notificationsService } from '.'
 import { sha256 } from '../utils/crypto'
+import { generateOffset, pageSchema } from '../utils/filter'
 import { prisma } from '../utils/prisma'
 
-export const paramsSchema = z.object({
-  pageSize: z.coerce.number().default(20),
-  current: z.coerce.number().default(1),
-  endpoint: z.string().trim().optional(),
-})
+export const paramsSchema = z
+  .object({
+    endpoint: z.string().trim(),
+  })
+  .partial()
+  .merge(pageSchema)
 
 export const querySchema = z.object({
   params: paramsSchema,
@@ -33,12 +35,9 @@ export function getCount(params: z.infer<typeof paramsSchema>) {
 }
 
 export function query({ params }: z.infer<typeof querySchema>) {
-  const take = params.pageSize
-  const skip = (params.current - 1) * params.pageSize
   return prisma.subscription.findMany({
     where: generateConditions(params),
-    take,
-    skip,
+    ...generateOffset(params),
   })
 }
 

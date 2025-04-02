@@ -4,6 +4,7 @@ import { HTTPException } from 'hono/http-exception'
 import { pick } from 'lodash-es'
 import { z } from 'zod'
 import { reminderQueue } from '../queues/reminder'
+import { generateOffset, pageSchema } from '../utils/filter'
 
 export async function getCounts() {
   const counts = await reminderQueue.getJobCounts()
@@ -14,37 +15,36 @@ export function clear() {
   return reminderQueue.obliterate({ force: true })
 }
 
-export const jobQuerySchema = z.object({
-  params: z.object({
-    current: z.coerce.number().default(1),
-    pageSize: z.coerce.number().default(20),
-    name: z.string().trim().optional(),
-    id: z.string().trim().optional(),
-  }),
+export const querySchema = z.object({
+  params: z
+    .object({
+      name: z.string().trim(),
+      id: z.string().trim(),
+    })
+    .partial()
+    .merge(pageSchema),
 })
 
 export function getJob(jobId: string) {
   return reminderQueue.getJob(jobId)
 }
 
-export async function getJobs({ params }: z.infer<typeof jobQuerySchema>) {
-  const limit = params.pageSize
-  const offset = (params.current - 1) * params.pageSize
+export async function getJobs({ params }: z.infer<typeof querySchema>) {
   const jobs = await reminderQueue.getJobs([])
 
-  const filteredJobs = jobs
-    .filter(j => {
-      if (params.name) {
-        return j.name.includes(params.name)
-      }
-      if (params.id) {
-        return j.id?.includes(params.id)
-      }
-      return true
-    })
-    .slice(offset, offset + limit)
+  const filteredJobs = jobs.filter(j => {
+    if (params.name) {
+      return j.name.includes(params.name)
+    }
+    if (params.id) {
+      return j.id?.includes(params.id)
+    }
+    return true
+  })
 
-  return { data: filteredJobs, total: jobs.length }
+  const { take, skip } = generateOffset(params)
+
+  return { data: filteredJobs.slice(skip, skip + take), total: filteredJobs.length }
 }
 
 export async function getStatus(key: string) {
