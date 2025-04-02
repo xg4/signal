@@ -7,6 +7,29 @@ import { generateOffset, orderSchema, pageSchema } from '../utils/filter'
 import { generateToken } from '../utils/jwt'
 import { prisma } from '../utils/prisma'
 
+export async function reset(userId: number, password: string) {
+  const hashPwd = await hashPassword(password)
+  return prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: {
+      password: hashPwd,
+    },
+  })
+}
+
+export function chmod(userId: number, role: z.infer<typeof userRoleSchema>) {
+  return prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: {
+      role,
+    },
+  })
+}
+
 const usernameSchema = z
   .string()
   .min(3, { message: '用户名至少需要 3 个字符' })
