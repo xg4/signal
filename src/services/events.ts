@@ -12,6 +12,7 @@ export const paramsSchema = z
   .object({
     name: z.string().trim(),
     startTime: z.coerce.date().array(),
+    id: z.coerce.number().int(),
   })
   .partial()
 
@@ -83,6 +84,9 @@ export async function getCount(params: z.infer<typeof paramsSchema>) {
 function generateConditions(params: z.infer<typeof paramsSchema>) {
   const [gte, lte] = params.startTime || []
   const conditions: Prisma.EventWhereInput = {
+    id: {
+      equals: params.id,
+    },
     startTime: {
       gte,
       lte,

@@ -13,8 +13,8 @@ WORKDIR /app
 COPY --from=deps /temp/dev/node_modules ./node_modules
 COPY . .
 
-# ENV NODE_ENV=production
-# RUN bun run build
+ENV NODE_ENV=production
+RUN bun run db:generate
 
 FROM base AS runner
 WORKDIR /app
@@ -25,8 +25,6 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/package.json ./package.json
-
-RUN bun run db:generate
 
 EXPOSE 3789/tcp
 
