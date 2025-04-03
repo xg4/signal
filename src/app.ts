@@ -36,10 +36,10 @@ app.onError((err, c) => {
   return c.json({ message: 'Internal Server Error' }, 500)
 })
 
-app.get('/', c => c.json({ status: 'ok', message: 'Signal API is running' }))
+app.get('/', c => c.json({ status: 'ok', date: new Date() }))
 
-app.route('/api/events', eventRoutes)
-app.route('/api/subscriptions', subscriptionRoutes)
-app.route('/api', userRoutes)
+app.route('/events', eventRoutes)
+app.route('/subscriptions', subscriptionRoutes)
+app.route('/', userRoutes)
 
 export default app
