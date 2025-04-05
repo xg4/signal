@@ -165,6 +165,7 @@ export const eventInsetSchema = z
     locations: z.string().array().optional(),
     durationMinutes: z.coerce.number().int().optional(),
     reminderTimes: z.coerce.number().int().array().optional(),
+    link: z.string().url().optional(),
   })
   .merge(
     z.object({

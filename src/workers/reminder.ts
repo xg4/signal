@@ -52,7 +52,7 @@ const processReminderJob = async (job: Job<ReminderJob>) => {
       const diff = dayjs(freshEvent.startTime).diff(dayjs(), 'minute')
 
       const title = [freshEvent.name, (diff <= 1 ? '' : dayjs(freshEvent.startTime).fromNow()) + '即将开始'].join(' - ')
-      const body = freshEvent.locations ? freshEvent.locations.join(' - ') : freshEvent.description || ''
+      const body = freshEvent.locations.length ? freshEvent.locations.join(' - ') : freshEvent.description || ''
       const payload = {
         title,
         body,

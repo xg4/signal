@@ -12,6 +12,7 @@ model Event {
   name            String
   description     String?
   locations       String[]
+  link            String?
   startTime       DateTime        @map("start_time")
   durationMinutes Int             @default(0) @map("duration_minutes")
   reminderTimes   Int[]           @map("reminder_times")
