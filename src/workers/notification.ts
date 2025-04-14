@@ -17,7 +17,7 @@ async function processNotificationJob(job: Job<NotificationJob>) {
 
 const notificationWorker = new Worker<NotificationJob>(QUEUE_NAMES.NOTIFICATION, processNotificationJob, {
   connection: redisConnection,
-  concurrency: 20,
+  concurrency: 10,
 })
 
 const logger = _logger.child({ worker: ['✉️', notificationWorker.name].join(': ') })

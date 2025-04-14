@@ -75,7 +75,7 @@ const processReminderJob = async (job: Job<ReminderJob>) => {
 
 const reminderWorker = new Worker<ReminderJob>(QUEUE_NAMES.REMINDER, processReminderJob, {
   connection: redisConnection,
-  concurrency: 10,
+  concurrency: 5,
 })
 
 const logger = _logger.child({ worker: ['⏰', reminderWorker.name].join('_') })
